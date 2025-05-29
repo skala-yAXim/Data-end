@@ -1,0 +1,10 @@
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+python-dotenv==1.0.1  # .env 파일을 로딩하기 위함
+
+# 선택적: vector DB 예시
+faiss-cpu==1.7.4         # FAISS를 사용할 경우
+# qdrant-client==1.7.3   # Qdrant를 사용할 경우 주석 해제
+
+# 선택적: Microsoft API 호출을 위한 HTTP 클라이언트
+httpx==0.27.0
