@@ -109,32 +109,45 @@ def get_headers(access_token: str):
         "Accept": "application/vnd.github+json"
     }
 
-async def fetch_commits(owner: str, repo: str, access_token: str, limit: int = 5) -> List[CommitEntry]:
-    url = f"{BASE_URL}/repos/{owner}/{repo}/commits"
-    try:
-        async with httpx.AsyncClient() as client:
-            res = await client.get(url, headers=get_headers(access_token), params={"per_page": limit})
-            res.raise_for_status()
+async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, limit_per_branch: int = 5) -> List[CommitEntry]:
+    branches_url = f"{BASE_URL}/repos/{owner}/{repo}/branches"
+    commits = []
 
-            commits = []
-            for item in res.json():
-                commit = item["commit"]
-                author_name = commit["author"]["name"] if commit.get("author") else None
+    async with httpx.AsyncClient() as client:
+        try:
+            # 1. 브랜치 목록 조회
+            res_branches = await client.get(branches_url, headers=get_headers(access_token))
+            res_branches.raise_for_status()
+            branches = res_branches.json()
 
-                commits.append(CommitEntry(
-                    repo=f"{owner}/{repo}",
-                    sha=item["sha"],
-                    message=commit.get("message"),
-                    date=commit["author"]["date"],
-                    author=author_name
-                ))
-            return commits
-    except httpx.HTTPStatusError as e:
-        print(f"HTTP error occurred: {e.response.status_code} - {e.response.text}")
-        raise
-    except Exception as e:
-        print(f"Unexpected error occurred: {str(e)}")
-        raise
+            # 2. 각 브랜치별 커밋 조회
+            for branch in branches:
+                branch_name = branch["name"]
+                commits_url = f"{BASE_URL}/repos/{owner}/{repo}/commits"
+                params = {"sha": branch_name, "per_page": limit_per_branch}
+                res_commits = await client.get(commits_url, headers=get_headers(access_token), params=params)
+                res_commits.raise_for_status()
+
+                for item in res_commits.json():
+                    commit = item["commit"]
+                    author_name = commit["author"]["name"] if commit.get("author") else None
+
+                    commits.append(CommitEntry(
+                        repo=f"{owner}/{repo}",
+                        sha=item["sha"],
+                        message=commit.get("message"),
+                        date=commit["author"]["date"],
+                        author=author_name
+                    ))
+
+        except httpx.HTTPStatusError as e:
+            print(f"HTTP error occurred: {e.response.status_code} - {e.response.text}")
+            raise
+        except Exception as e:
+            print(f"Unexpected error occurred: {str(e)}")
+            raise
+
+    return commits
 
 
 async def fetch_pull_requests(owner: str, repo: str, access_token: str) -> List[PullRequestEntry]:
@@ -221,7 +234,7 @@ async def fetch_readme(owner: str, repo: str, access_token: str) -> Optional[Rea
         return None
 
 async def fetch_all_data_for_repo(owner: str, repo: str, access_token: str):
-    commits = await fetch_commits(owner, repo, access_token)
+    commits = await fetch_all_branch_commits(owner, repo, access_token)
     prs = await fetch_pull_requests(owner, repo, access_token)
     issues = await fetch_issues(owner, repo, access_token)
     readme = await fetch_readme(owner, repo, access_token)
@@ -282,7 +295,7 @@ def group_activities_by_author(results: List[dict]) -> List[UserActivitySchema]:
     return user_activities
 
 async def fetch_github_data():
-    print(GITHUB_PRIVATE_KEY_PATH)
+    # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정
     private_key = load_private_key(GITHUB_PRIVATE_KEY_PATH)
     jwt_token = create_jwt_token(GITHUB_APP_ID, private_key)
     access_token, installation_info = get_installation_access_token(jwt_token)
