@@ -1,3 +1,4 @@
+from collections import defaultdict
 import requests
 import time
 from datetime import datetime, timezone
@@ -85,7 +86,7 @@ def get_installation_access_token(jwt_token: str):
 
     # 첫 번째 설치 정보 사용 (필요시 여러 개 중 선택 로직 추가 가능)
     # TODO: DB에서 installation id를 가져와서 넣는 방식으로 수정
-    install = installations[1]
+    install = installations[0]
     installation_id = install['id']
 
     print(f"Installation ID: {installation_id}")
@@ -247,6 +248,39 @@ async def fetch_repositories(access_token: str) -> List[Tuple[str, str]]:
             for repo in data.get("repositories", [])
         ]
 
+def group_activities_by_author(results: List[dict]) -> List[UserActivitySchema]:
+    # TODO: 유저별로 묶을 때 readme 데이터 어떻게 할지 고민해야함
+    # TODO: 계정정보 -> 같은 사람이 두 개로 나뉘어져서 나오는 문제 해결해야 함!
+    user_map = defaultdict(lambda: {
+        "commits": [],
+        "pull_requests": [],
+        "issues": []
+    })
+
+    for repo_data in results:
+        for commit in repo_data["commits"]:
+            if commit.author:
+                user_map[commit.author]["commits"].append(commit)
+
+        for pr in repo_data["pull_requests"]:
+            if pr.author:
+                user_map[pr.author]["pull_requests"].append(pr)
+
+        for issue in repo_data["issues"]:
+            if issue.author:
+                user_map[issue.author]["issues"].append(issue)
+
+    user_activities = []
+    for author, activities in user_map.items():
+        user_activities.append(UserActivitySchema(
+            author=author,
+            commits=activities["commits"],
+            pull_requests=activities["pull_requests"],
+            issues=activities["issues"],
+        ))
+
+    return user_activities
+
 async def fetch_github_data():
     print(GITHUB_PRIVATE_KEY_PATH)
     private_key = load_private_key(GITHUB_PRIVATE_KEY_PATH)
@@ -255,12 +289,10 @@ async def fetch_github_data():
     
     repos = await fetch_repositories(access_token=access_token)
     
-    # return repos
-    
     tasks = [
         fetch_all_data_for_repo(owner, repo, access_token)
         for owner, repo in repos
     ]
     results = await asyncio.gather(*tasks)
 
-    return results
+    return group_activities_by_author(results)
