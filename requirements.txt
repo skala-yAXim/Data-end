@@ -2,9 +2,13 @@ fastapi==0.110.0
 uvicorn[standard]==0.29.0
 python-dotenv==1.0.1  # .env 파일을 로딩하기 위함
 
-# 선택적: vector DB 예시
-faiss-cpu==1.7.4         # FAISS를 사용할 경우
-# qdrant-client==1.7.3   # Qdrant를 사용할 경우 주석 해제
+pydantic==2.7.1  # FastAPI 0.110.x는 Pydantic v2 지원
 
-# 선택적: Microsoft API 호출을 위한 HTTP 클라이언트
+# GitHub App 인증용 JWT 생성 및 PEM 키 처리를 위한 라이브러리
+PyJWT==2.7.0
+cryptography==41.0.3
+
+
+
+requests==2.31.0
 httpx==0.27.0
