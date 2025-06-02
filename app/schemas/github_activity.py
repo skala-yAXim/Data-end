@@ -31,8 +31,28 @@ class ReadmeInfo(BaseModel):
     html_url: str
     download_url: Optional[str]
 
+class CommitActivity(BaseModel):
+    repo: str
+    sha: str
+    message: Optional[str]
+    date: datetime
+
+class PullRequestActivity(BaseModel):
+    repo: str
+    number: int
+    title: Optional[str]
+    created_at: datetime
+    state: str
+
+class IssueActivity(BaseModel):
+    repo: str
+    number: int
+    title: Optional[str]
+    created_at: datetime
+    state: str
+
 class UserActivitySchema(BaseModel):
     author: str
-    commits: List[CommitEntry]
-    pull_requests: List[PullRequestEntry]
-    issues: List[IssueEntry]
+    commits: List[CommitActivity]
+    pull_requests: List[PullRequestActivity]
+    issues: List[IssueActivity]
