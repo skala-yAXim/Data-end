@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import json
 from dateutil.parser import parse
 from typing import List
 from app.core.config import MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_TENANT_ID
@@ -144,11 +145,26 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
                 date = parse(date_str) if date_str else datetime.now(timezone.utc)
             except Exception:
                 date = datetime.now(timezone.utc)
-            attachments = [
-                att.get("name")
-                for att in item.get("attachments", [])
-                if att.get("name") is not None
-            ]
+            
+            
+            attachments_raw = item.get("attachments", [])
+
+            attachments = []
+            application_content = None
+
+            for att in attachments_raw:
+                content_type = att.get("contentType")
+                
+                if content_type == "application/vnd.microsoft.card.adaptive":
+                    # Adaptive Card 내용 처리
+                    attachment_content = att.get("content", "")
+                    if content:
+                        application_content = extract_text_values(attachment_content)
+                else:
+                    # 일반 파일 첨부 처리
+                    name = att.get("name")
+                    if name:
+                        attachments.append(name)
 
             replies: List[ReplyEntry] = fetch_replies_for_message(token, team_id, channel_id, item["id"])
 
@@ -162,6 +178,7 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
                 content=content,
                 date=date,
                 attachments=attachments if attachments else [],
+                application_content=application_content,
                 replies=replies
             ))
 
@@ -205,3 +222,25 @@ async def fetch_teams_posts_data():
   # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정
   token = get_access_token(client_id=MICROSOFT_CLIENT_ID, client_secret=MICROSOFT_CLIENT_SECRET, tenant_id=MICROSOFT_TENANT_ID)
   return fetch_all_team_posts(token)
+
+
+def extract_text_values(json_str):
+    def recursive_extract(obj, results):
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                if key == "text":
+                    results.append(value)
+                else:
+                    recursive_extract(value, results)
+        elif isinstance(obj, list):
+            for item in obj:
+                recursive_extract(item, results)
+
+    try:
+        parsed = json.loads(json_str)
+        texts = []
+        recursive_extract(parsed, texts)
+        return texts
+    except json.JSONDecodeError as e:
+        print("Invalid JSON:", e)
+        return []

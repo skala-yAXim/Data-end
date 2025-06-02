@@ -17,6 +17,7 @@ class PostEntry(BaseModel):
   content: str
   replies: Optional[List[ReplyEntry]]
   attachments: Optional[List[str]]
+  application_content: Optional[List[str]]
   date: datetime
   
 class TeamPost(BaseModel):
