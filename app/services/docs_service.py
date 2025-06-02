@@ -87,11 +87,26 @@ def fetch_drive_files(access_token: str, drive_id: str, folder_id: Optional[str]
             else "folder" if "folder" in item else "unknown"
         )
 
+        authors = set()
+
         # 작성자 정보
-        authors = []
         created_by = item.get("createdBy", {}).get("user", {})
         if created_by:
-            authors.append(created_by.get("email") or created_by.get("displayName", "알 수 없음"))
+            email = created_by.get("email") or created_by.get("displayName", "알 수 없음")
+            authors.add(email)
+
+        # 파일 버전 기록 확인
+        if "file" in item:
+            versions_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item['id']}/versions"
+            versions_response = requests.get(versions_url, headers=headers)
+
+            if versions_response.status_code == 200:
+                versions = versions_response.json().get("value", [])
+                for version in versions:
+                    modified_by = version.get("lastModifiedBy", {}).get("user", {})
+                    if modified_by:
+                        email = modified_by.get("email") or modified_by.get("displayName", "알 수 없음")
+                        authors.add(email)
 
         # 폴더면 재귀적으로 내부 파일 가져오기
         if "folder" in item:
@@ -100,7 +115,7 @@ def fetch_drive_files(access_token: str, drive_id: str, folder_id: Optional[str]
         else:
             entry = DocsEntry(
                 filename=filename,
-                author=authors,
+                author=list(authors),
                 last_modified=datetime.fromisoformat(last_modified.replace("Z", "+00:00")) if last_modified else None,
                 type=file_type,
                 size=size,
