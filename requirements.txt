@@ -1,6 +1,7 @@
 fastapi==0.110.0
 uvicorn[standard]==0.29.0
 python-dotenv==1.0.1  # .env 파일을 로딩하기 위함
+python-dateutil==2.9.0.post0
 
 pydantic==2.7.1  # FastAPI 0.110.x는 Pydantic v2 지원
 
