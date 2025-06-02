@@ -112,6 +112,25 @@ def get_headers(access_token: str):
         "Accept": "application/vnd.github+json"
     }
 
+async def fetch_user_email(username: str, access_token: str, client: httpx.AsyncClient) -> Optional[str]:
+    """
+    사용자 GitHub 공개 이메일을 조회합니다. 없을 경우 None을 반환합니다.
+    """
+    user_url = f"{BASE_URL}/users/{username}"
+    headers = get_headers(access_token)
+
+    try:
+        res = await client.get(user_url, headers=headers)
+        res.raise_for_status()
+        user_data = res.json()
+        return user_data.get("email")  # 이메일이 공개된 경우만 반환
+    except httpx.HTTPStatusError as e:
+        print(f"HTTP error while fetching user {username}: {e.response.status_code}")
+    except Exception as e:
+        print(f"Unexpected error while fetching user {username}: {e}")
+    
+    return None
+
 async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, limit_per_branch: int = 5) -> List[CommitEntry]:
     branches_url = f"{BASE_URL}/repos/{owner}/{repo}/branches"
     commits = []
@@ -133,7 +152,7 @@ async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, lim
 
                 for item in res_commits.json():
                     commit = item["commit"]
-                    author_name = commit["author"]["name"] if commit.get("author") else None
+                    author_name = commit["author"]["email"] if commit.get("author") else None
 
                     commits.append(CommitEntry(
                         repo=f"{owner}/{repo}",
@@ -161,17 +180,26 @@ async def fetch_pull_requests(owner: str, repo: str, access_token: str) -> List[
             res = await client.get(url, headers=get_headers(access_token))
             res.raise_for_status()
 
-            return [
-                PullRequestEntry(
+            pull_requests = res.json()
+            result = []
+
+            for pr in pull_requests:
+                username = pr["user"]["login"] if pr.get("user") else None
+                author_email = None
+
+                if username:
+                    author_email = await fetch_user_email(username, access_token, client)
+
+                result.append(PullRequestEntry(
                     repo=f"{owner}/{repo}",
                     number=pr["number"],
                     title=pr.get("title"),
                     created_at=pr["created_at"],
                     state=pr["state"],
-                    author=pr["user"]["login"] if pr.get("user") else None  # PR 작성자
-                )
-                for pr in res.json()
-            ]
+                    author=author_email or username  # fallback to username
+                ))
+
+            return result
     except httpx.HTTPStatusError as e:
         print(f"HTTP error occurred while fetching PRs: {e.response.status_code} - {e.response.text}")
         return []
@@ -192,14 +220,22 @@ async def fetch_issues(owner: str, repo: str, access_token: str) -> List[IssueEn
             for issue in res.json():
                 if "pull_request" in issue:
                     continue
+
+                username = issue["user"]["login"] if issue.get("user") else None
+                author_email = None
+
+                if username:
+                    author_email = await fetch_user_email(username, access_token, client)
+
                 issues.append(IssueEntry(
                     repo=f"{owner}/{repo}",
                     number=issue["number"],
                     title=issue.get("title"),
                     created_at=issue["created_at"],
                     state=issue["state"],
-                    author=issue["user"]["login"] if issue.get("user") else None  # 이슈 작성자
+                    author=author_email or username
                 ))
+
             return issues
 
     except httpx.HTTPStatusError as e:
