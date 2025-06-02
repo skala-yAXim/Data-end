@@ -42,15 +42,6 @@ def get_sharepoint_domain(access_token: str) -> str:
     else:
         raise Exception(f"SharePoint 도메인 조회 실패: {response.status_code} - {response.text}")
 
-def get_site_id(access_token: str, domain: str, site_name: str) -> str:
-    url = f"https://graph.microsoft.com/v1.0/sites/{domain}:/sites/{site_name}"
-    headers = {"Authorization": f"Bearer {access_token}"}
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        return response.json().get("id")
-    else:
-        raise Exception(f"사이트 ID 조회 실패: {response.status_code} - {response.text}")
-
 def get_drive_id(access_token: str, site_id: str) -> str:
     url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive"
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -138,13 +129,19 @@ def fetch_all_sites_files(access_token: str, domain: str) -> List[DocsEntry]:
     all_entries: List[DocsEntry] = []
 
     for site in sites:
+        site_id = site.get("id")
         site_name = site.get("name")
-        if not site_name:
-            continue
+        site_url = site.get("webUrl", "")
+          
+        if not site_id:
+          print(f"[건너뜀] site_id 없음: {site}")
+          continue
+        
+        print(f"[시도 중] 사이트 이름: {site_name}, 주소: {site_url}")
 
         try:
             # 2. 사이트 ID 조회
-            site_id = get_site_id(access_token, domain, site_name)
+            site_id = site_id
             if not site_id:
                 continue
 
