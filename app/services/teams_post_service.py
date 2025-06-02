@@ -30,6 +30,19 @@ def get_access_token(client_id: str, client_secret: str, tenant_id: str):
         error_description = result.get("error_description", "No description provided.")
         raise Exception(f"토큰 요청 실패: {error} - {error_description}")
 
+def get_user_email(user_id: str, access_token: str) -> str:
+    url = f"https://graph.microsoft.com/v1.0/users/{user_id}"
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+    }
+
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        data = response.json()
+        return data.get("mail") or data.get("userPrincipalName") or "알 수 없음"
+    else:
+        return "알 수 없음"
+
 def fetch_all_teams(token: str):
     endpoint = "https://graph.microsoft.com/v1.0/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')"
     headers = {
@@ -76,7 +89,7 @@ def fetch_replies_for_message(token: str, team_id: str, channel_id: str, message
     if response.status_code == 200:
         reply_data = response.json().get("value", [])
         for reply in reply_data:
-            reply_author = reply.get("from", {}).get("user", {}).get("displayName", "알 수 없음")
+            reply_author = reply.get("from", {}).get("user", {}).get("userPrincipalName", "알 수 없음")
             reply_content = reply.get("body", {}).get("content", "")
             reply_date_str = reply.get("createdDateTime", "")
             try:
@@ -123,7 +136,6 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
         for item in data.get("value", []):
             # print(item)
             from_info = item.get("from")
-
             if from_info is None:
                 author = "System"
             else:
@@ -131,7 +143,8 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
                 application_info = from_info.get("application")
 
                 if user_info:
-                    author = user_info.get("displayName", "알 수 없음")
+                    user_id = user_info.get("id")
+                    author = get_user_email(user_id, token) if user_id else "알 수 없음"
                 elif application_info:
                     author = application_info.get("displayName", "알 수 없음")
                 else:
