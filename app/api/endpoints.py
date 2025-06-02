@@ -1,5 +1,6 @@
 from app.schemas.email_activity import UserEmailActivitySchema
 from app.schemas.github_activity import UserActivitySchema
+from app.schemas.teams_post_activity import TeamPost
 from app.services.email_service import fetch_all_email_data
 from app.services.github_service import fetch_github_data
 from app.services.teams_post_service import fetch_teams_posts_data
@@ -29,7 +30,7 @@ async def get_outlook_data():
     data = await fetch_all_email_data()
     return data
 
-@router.get("/teams/post")
+@router.get("/teams/post", response_model=List[TeamPost])
 async def get_teams_post_data():
     """
     조직 내 Teams 게시물 데이터를 반환합니다.
