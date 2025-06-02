@@ -13,6 +13,7 @@ class PullRequestEntry(BaseModel):
     repo: str
     number: int
     title: Optional[str]
+    content: Optional[str]
     created_at: datetime
     state: str
     author: Optional[str]
@@ -41,6 +42,7 @@ class PullRequestActivity(BaseModel):
     repo: str
     number: int
     title: Optional[str]
+    content: Optional[str]
     created_at: datetime
     state: str
 

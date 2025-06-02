@@ -194,6 +194,7 @@ async def fetch_pull_requests(owner: str, repo: str, access_token: str) -> List[
                     repo=f"{owner}/{repo}",
                     number=pr["number"],
                     title=pr.get("title"),
+                    content=pr.get("body"),
                     created_at=pr["created_at"],
                     state=pr["state"],
                     author=author_email or username  # fallback to username
@@ -328,6 +329,7 @@ def group_activities_by_author(results: List[dict]) -> List[UserActivitySchema]:
                         repo=pr.repo,
                         number=pr.number,
                         title=pr.title,
+                        content=pr.content,
                         created_at=pr.created_at,
                         state=pr.state
                     )
