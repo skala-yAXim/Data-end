@@ -14,6 +14,9 @@ from app.schemas.github_activity import (
     PullRequestEntry,
     IssueEntry,
     ReadmeInfo,
+    CommitActivity,
+    PullRequestActivity,
+    IssueActivity,
     UserActivitySchema
 )
 from app.core.config import GITHUB_APP_ID, GITHUB_PRIVATE_KEY_PATH
@@ -273,15 +276,38 @@ def group_activities_by_author(results: List[dict]) -> List[UserActivitySchema]:
     for repo_data in results:
         for commit in repo_data["commits"]:
             if commit.author:
-                user_map[commit.author]["commits"].append(commit)
+                user_map[commit.author]["commits"].append(
+                    CommitActivity(
+                        repo=commit.repo,
+                        sha=commit.sha,
+                        message=commit.message,
+                        date=commit.date
+                    )
+                )
 
         for pr in repo_data["pull_requests"]:
             if pr.author:
-                user_map[pr.author]["pull_requests"].append(pr)
+                user_map[pr.author]["pull_requests"].append(
+                    PullRequestActivity(
+                        repo=pr.repo,
+                        number=pr.number,
+                        title=pr.title,
+                        created_at=pr.created_at,
+                        state=pr.state
+                    )
+                )
 
         for issue in repo_data["issues"]:
             if issue.author:
-                user_map[issue.author]["issues"].append(issue)
+                user_map[issue.author]["issues"].append(
+                    IssueActivity(
+                        repo=issue.repo,
+                        number=issue.number,
+                        title=issue.title,
+                        created_at=issue.created_at,
+                        state=issue.state
+                    )
+                )
 
     user_activities = []
     for author, activities in user_map.items():
