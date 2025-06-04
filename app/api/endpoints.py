@@ -5,7 +5,7 @@ from app.schemas.teams_post_activity import TeamPost
 from app.services.docs_service import fetch_docs_data
 from app.services.email_service import fetch_all_email_data
 from app.services.github_service import fetch_github_data
-from app.services.teams_post_service import fetch_teams_posts_data
+from app.services.teams_post_service import save_teams_posts_data
 from fastapi import APIRouter, Request
 from typing import List, Dict
 
@@ -37,7 +37,7 @@ async def get_teams_post_data():
     """
     조직 내 Teams 게시물 데이터를 반환합니다.
     """
-    data = await fetch_teams_posts_data()
+    data = await save_teams_posts_data()
     return data
 
 @router.get("/document/data", response_model=List[DocsEntry])
