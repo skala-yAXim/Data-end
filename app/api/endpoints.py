@@ -6,7 +6,7 @@ from app.services.docs_service import fetch_docs_data
 from app.services.email_service import fetch_all_email_data
 from app.services.github_service import fetch_github_data
 from app.services.teams_post_service import fetch_teams_posts_data
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from typing import List, Dict
 
 router = APIRouter()
@@ -47,3 +47,11 @@ async def get_document_data():
     """
     data = await fetch_docs_data()
     return data
+
+@router.get("/collections")
+def list_collections(request: Request):
+    """
+    VectorDB 연결 확인 api, DB의 collection 리스트 반환
+    """
+    qdrant = request.app.state.qdrant_client
+    return qdrant.get_collections()
