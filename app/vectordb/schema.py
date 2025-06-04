@@ -18,7 +18,32 @@ class DocumentMetadata(BaseMetadata):
   last_modified: datetime
   type: str
   size: int
+  
+class GitCommitMetadata(BaseMetadata):
+  author: str
+  date: datetime
+  type: str
+  repo_name: str
+  sha: str
 
+class GitPRMetadata(BaseMetadata):
+  author: str
+  date: datetime
+  type: str
+  repo_name: str
+  number: int
+  state: str
+  
+class GitIssueMetadata(BaseMetadata):
+  author: str
+  date: datetime
+  type: str
+  repo_name: str
+  number: int
+
+class EmailMetadata(BaseMetadata):
+  user_id: str
+  date: datetime
   
 M = TypeVar("M", bound=BaseMetadata)
 

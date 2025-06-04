@@ -1,13 +1,12 @@
 from app.schemas.docs_activity import DocsEntry
 from app.schemas.email_activity import UserEmailActivitySchema
-from app.schemas.github_activity import UserActivitySchema
 from app.schemas.teams_post_activity import TeamPost
 from app.services.docs_service import save_docs_data
 from app.services.email_service import fetch_all_email_data
-from app.services.github_service import fetch_github_data
+from app.services.github_service import save_github_data
 from app.services.teams_post_service import save_teams_posts_data
 from fastapi import APIRouter, Request
-from typing import List, Dict
+from typing import List
 
 router = APIRouter()
 
@@ -16,12 +15,12 @@ def read_root():
     return {"message": "Hello from FastAPI"}
 
 
-@router.get("/github/data", response_model=List[UserActivitySchema])
+@router.get("/github/data")
 async def get_github_data():
     """
-    설치된 모든 GitHub repository에 대해 커밋, PR, 이슈, README 데이터를 반환합니다.
+    설치된 모든 GitHub repository에 대해 커밋, PR, 이슈 데이터를 저장하여 반환합니다.
     """
-    data = await fetch_github_data()
+    data = await save_github_data()
     return data
 
 @router.get("/outlook/data", response_model=List[UserEmailActivitySchema])
