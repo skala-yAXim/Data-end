@@ -1,10 +1,10 @@
 from app.schemas.docs_activity import DocsEntry
 from app.schemas.email_activity import EmailEntry
 from app.schemas.teams_post_activity import PostEntry
-from app.services.docs_service import save_docs_data
-from app.services.email_service import save_all_email_data
-from app.services.github_service import save_github_data
-from app.services.teams_post_service import save_teams_posts_data
+from app.pipeline.docs_pipeline import save_docs_data
+from app.pipeline.email_pipeline import save_all_email_data
+from app.pipeline.github_pipeline import save_github_data
+from app.pipeline.teams_post_pipeline import save_teams_posts_data
 from fastapi import APIRouter, Request
 from typing import List
 
