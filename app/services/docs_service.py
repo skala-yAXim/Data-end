@@ -3,7 +3,7 @@ import os
 from tempfile import mkdtemp
 import tempfile
 from typing import List, Optional
-from app.core.config import MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_TENANT_ID
+from app.common.config import MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_TENANT_ID
 from app.schemas.docs_activity import DocsEntry
 from msal import ConfidentialClientApplication
 import requests

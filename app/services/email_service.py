@@ -3,7 +3,7 @@ from msal import ConfidentialClientApplication
 import requests
 from typing import Dict, List
 from app.schemas.email_activity import EmailEntry
-from app.core.config import MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_TENANT_ID
+from app.common.config import MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_TENANT_ID
 from app.vectordb.schema import BaseRecord, EmailMetadata
 from app.vectordb.uploader import upload_data_to_db
 

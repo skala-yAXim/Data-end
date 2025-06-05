@@ -12,7 +12,7 @@ from app.schemas.github_activity import (
     IssueEntry,
     ReadmeInfo
 )
-from app.core.config import GITHUB_APP_ID, GITHUB_PRIVATE_KEY_PATH
+from app.common.config import GITHUB_APP_ID, GITHUB_PRIVATE_KEY_PATH
 from app.vectordb.schema import BaseRecord, GitCommitMetadata, GitIssueMetadata, GitPRMetadata
 from app.vectordb.uploader import upload_data_to_db
 

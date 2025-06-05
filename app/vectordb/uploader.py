@@ -1,4 +1,4 @@
-from app.core.config import EMBEDDING_MODEL_NAME
+from app.common.config import EMBEDDING_MODEL_NAME
 from app.vectordb.client import create_collection, get_qdrant_client
 from app.vectordb.schema import BaseRecord
 from sentence_transformers import SentenceTransformer
