@@ -3,6 +3,7 @@ from typing import List, Optional
 from datetime import datetime
 
 class EmailEntry(BaseModel):
+    author: str
     sender: str
     receiver: str
     subject: str
@@ -10,7 +11,3 @@ class EmailEntry(BaseModel):
     date: datetime
     conversation_id: Optional[str]
     attachment_list: Optional[List[str]]
-
-class UserEmailActivitySchema(BaseModel):
-    author: str
-    emails: List[EmailEntry]

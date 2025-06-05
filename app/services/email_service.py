@@ -2,8 +2,10 @@ from datetime import datetime, timezone
 from msal import ConfidentialClientApplication
 import requests
 from typing import Dict, List
-from app.schemas.email_activity import EmailEntry, UserEmailActivitySchema
+from app.schemas.email_activity import EmailEntry
 from app.core.config import MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_TENANT_ID
+from app.vectordb.schema import BaseRecord, EmailMetadata
+from app.vectordb.uploader import upload_data_to_db
 
 def get_access_token(client_id: str, client_secret: str, tenant_id: str):
     # Graph API 설정
@@ -75,6 +77,7 @@ def fetch_user_inbox_emails(token: str, user_email: str) -> List[EmailEntry]:
             attachment_list = [att.get("name", "") for att in attachments if att.get("@odata.type") != "#microsoft.graph.itemAttachment"]
 
             email_entry = EmailEntry(
+                author=user_email,
                 sender=sender,
                 receiver=receiver,
                 subject=subject,
@@ -123,6 +126,7 @@ def fetch_user_sent_emails(token: str, user_email: str) -> List[EmailEntry]:
             attachment_list = [att.get("name", "") for att in attachments if att.get("@odata.type") != "#microsoft.graph.itemAttachment"]
 
             email_entry = EmailEntry(
+                author=user_email,
                 sender=sender,
                 receiver=receiver,
                 subject=subject,
@@ -139,26 +143,52 @@ def fetch_user_sent_emails(token: str, user_email: str) -> List[EmailEntry]:
         print(f"API 요청 실패: {response.status_code}")
         print(response.text)
         return []
-def fetch_all_users_emails(token: str) -> List[UserEmailActivitySchema]:
-    """모든 유저에 대해 메일 리스트 조회하여 UserEmailActivitySchema 리스트로 반환"""
+    
+def fetch_all_users_emails(token: str) -> List[EmailEntry]:
+    """
+    모든 유저에 대해 받은 편지함과 보낸 편지함 메일을 조회하여 EmailEntry 리스트로 반환
+    """
     user_emails = fetch_user_emails(token)
-    all_results: List[UserEmailActivitySchema] = []
+    all_emails: List[EmailEntry] = []
 
-    for email in user_emails:
-        print(f"사용자: {email} 메일 조회 중...")
-        inbox_emails = fetch_user_inbox_emails(token, email)
-        sent_emails = fetch_user_sent_emails(token, email)
-        combined_emails = inbox_emails + sent_emails
+    for user_email in user_emails:
+        print(f"[INFO] 사용자 '{user_email}'의 메일을 조회 중...")
 
-        user_activity = UserEmailActivitySchema(
-            author=email,
-            emails=combined_emails
+        inbox = fetch_user_inbox_emails(token, user_email)
+        sent = fetch_user_sent_emails(token, user_email)
+
+        all_emails.extend(inbox)
+        all_emails.extend(sent)
+
+    return all_emails
+
+
+async def save_all_email_data():
+    # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정
+    token = get_access_token(client_id=MICROSOFT_CLIENT_ID, client_secret=MICROSOFT_CLIENT_SECRET, tenant_id=MICROSOFT_TENANT_ID)
+    
+    all_emails = fetch_all_users_emails(token)
+    
+    collection_name = "Emails"
+    records = [extract_email_content(email) for email in all_emails]
+    
+    if records:
+        upload_data_to_db(collection_name=collection_name, records=records)
+        
+    return all_emails
+
+def extract_email_content(email: EmailEntry) -> BaseRecord[EmailMetadata]:
+    attachments_text = ", ".join(email.attachment_list) if email.attachment_list else "None"
+    combined_text = f"Content: {email.content.strip()}\nAttachments: {attachments_text}"
+    
+    return BaseRecord[EmailMetadata](
+        text=combined_text,
+        metadata=EmailMetadata(
+            author=email.author,
+            sender=email.sender,
+            receiver=email.receiver,
+            subject=email.subject,
+            date=email.date,
+            conversation_id=email.conversation_id
         )
-        all_results.append(user_activity)
-
-    return all_results
-
-async def fetch_all_email_data():
-  # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정
-  token = get_access_token(client_id=MICROSOFT_CLIENT_ID, client_secret=MICROSOFT_CLIENT_SECRET, tenant_id=MICROSOFT_TENANT_ID)
-  return fetch_all_users_emails(token)
+    )

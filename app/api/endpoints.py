@@ -1,8 +1,8 @@
 from app.schemas.docs_activity import DocsEntry
-from app.schemas.email_activity import UserEmailActivitySchema
+from app.schemas.email_activity import EmailEntry
 from app.schemas.teams_post_activity import TeamPost
 from app.services.docs_service import save_docs_data
-from app.services.email_service import fetch_all_email_data
+from app.services.email_service import save_all_email_data
 from app.services.github_service import save_github_data
 from app.services.teams_post_service import save_teams_posts_data
 from fastapi import APIRouter, Request
@@ -23,12 +23,12 @@ async def get_github_data():
     data = await save_github_data()
     return data
 
-@router.get("/outlook/data", response_model=List[UserEmailActivitySchema])
+@router.get("/outlook/data", response_model=List[EmailEntry])
 async def get_outlook_data():
     """
-    모든 사용자의 outlook 이메일 데이터를 반환합니다.
+    모든 사용자의 outlook 이메일 데이터를 저장 후 반환합니다.
     """
-    data = await fetch_all_email_data()
+    data = await save_all_email_data()
     return data
 
 @router.get("/teams/post", response_model=List[TeamPost])

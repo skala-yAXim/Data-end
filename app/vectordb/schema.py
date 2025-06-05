@@ -42,7 +42,11 @@ class GitIssueMetadata(BaseMetadata):
   number: int
 
 class EmailMetadata(BaseMetadata):
-  user_id: str
+  author: str
+  sender: str
+  receiver: str
+  subject: str
+  conversation_id: str
   date: datetime
   
 M = TypeVar("M", bound=BaseMetadata)
