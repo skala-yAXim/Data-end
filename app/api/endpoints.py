@@ -1,6 +1,6 @@
 from app.schemas.docs_activity import DocsEntry
 from app.schemas.email_activity import EmailEntry
-from app.schemas.teams_post_activity import TeamPost
+from app.schemas.teams_post_activity import PostEntry
 from app.services.docs_service import save_docs_data
 from app.services.email_service import save_all_email_data
 from app.services.github_service import save_github_data
@@ -31,7 +31,7 @@ async def get_outlook_data():
     data = await save_all_email_data()
     return data
 
-@router.get("/teams/post", response_model=List[TeamPost])
+@router.get("/teams/post", response_model=List[PostEntry])
 async def get_teams_post_data():
     """
     조직 내 Teams 게시물 데이터를 저장 후 반환합니다.

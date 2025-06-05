@@ -62,14 +62,7 @@ def get_installation_access_token(jwt_token: str):
     if not installations:
         raise Exception("No installations found for this GitHub App.")
 
-    # 첫 번째 설치 정보 사용 (필요시 여러 개 중 선택 로직 추가 가능)
     # TODO: DB에서 installation id를 가져와서 넣는 방식으로 수정
-    install = installations[2]
-    installation_id = install['id']
-
-    print(f"Installation ID: {installation_id}")
-    print(f"Target login: {install['account']['login']} ({install['account']['type']})")
-
     # Installation Access Token 요청
     access_token_url = f"https://api.github.com/app/installations/68835585/access_tokens"
     token_response = requests.post(access_token_url, headers=headers)
@@ -79,7 +72,7 @@ def get_installation_access_token(jwt_token: str):
     if not access_token:
         raise Exception("Failed to obtain installation access token.")
 
-    return access_token, install
+    return access_token
 
 def get_headers(access_token: str):
     return {
@@ -298,7 +291,7 @@ async def save_github_data():
     # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정
     private_key = load_private_key(GITHUB_PRIVATE_KEY_PATH)
     jwt_token = create_jwt_token(GITHUB_APP_ID, private_key)
-    access_token, installation_info = get_installation_access_token(jwt_token)
+    access_token = get_installation_access_token(jwt_token)
     
     repos = await fetch_repositories(access_token=access_token)
     

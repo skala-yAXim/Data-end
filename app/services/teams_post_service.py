@@ -4,7 +4,7 @@ import re
 from dateutil.parser import parse
 from typing import List, Union
 from app.core.config import MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_TENANT_ID
-from app.schemas.teams_post_activity import PostEntry, ReplyEntry, TeamPost
+from app.schemas.teams_post_activity import PostEntry, ReplyEntry
 from app.vectordb.schema import BaseRecord, TeamsPostMetadata
 from app.vectordb.uploader import upload_data_to_db
 from msal import ConfidentialClientApplication
@@ -203,8 +203,8 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
 
     return posts
 
-def fetch_all_team_posts(token: str) -> List[TeamPost]:
-    all_team_posts: List[TeamPost] = []
+def fetch_all_team_posts(token: str) -> List[PostEntry]:
+    all_team_posts: List[PostEntry] = []
     teams = fetch_all_teams(token)
 
     for team in teams:
@@ -227,28 +227,26 @@ def fetch_all_team_posts(token: str) -> List[TeamPost]:
         except Exception as e:
             print(f"오류 발생 (팀:{team_name}): {e}")
 
-        all_team_posts.append(TeamPost(
-            team_id=team_id,
-            team_name=team_name,
-            posts=team_posts if team_posts else None
-        ))
+        all_team_posts.extend(team_posts)
 
     return all_team_posts
 
 async def save_teams_posts_data():
-  # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정
-  token = get_access_token(client_id=MICROSOFT_CLIENT_ID, client_secret=MICROSOFT_CLIENT_SECRET, tenant_id=MICROSOFT_TENANT_ID)
-  
-  posts_data = fetch_all_team_posts(token)
-  
-  preprocessed_docs = extract_texts_from_posts_data(posts_data)
-  
-  collection_name = "Teams-Posts"
-  
-  upload_data_to_db(collection_name=collection_name, records=preprocessed_docs)
-  
-  return posts_data
-
+    # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정
+    token = get_access_token(client_id=MICROSOFT_CLIENT_ID, client_secret=MICROSOFT_CLIENT_SECRET, tenant_id=MICROSOFT_TENANT_ID)
+    
+    posts_data = fetch_all_team_posts(token)
+    
+    records = []
+    for team_post in posts_data:
+        preprocessed_docs = extract_texts_from_posts_data(team_post)
+        records.extend(preprocessed_docs)
+    
+    collection_name = "Teams-Posts"
+    
+    upload_data_to_db(collection_name=collection_name, records=records)
+    
+    return posts_data
 
 def extract_text_values(json_str):
     def recursive_extract(obj, results):
@@ -274,41 +272,39 @@ def extract_text_values(json_str):
 def clean_html(raw_html):
     return re.sub(r'<[^>]+>', '', raw_html)
 
-def extract_texts_from_posts_data(team_posts: List[TeamPost]) -> List[BaseRecord[TeamsPostMetadata]]:
+def extract_texts_from_posts_data(team_post: PostEntry) -> List[BaseRecord[TeamsPostMetadata]]:
     docs: List[BaseRecord[TeamsPostMetadata]] = []
 
-    for team_post in team_posts:
-        for post in team_post.posts or []:
-            parsed = parse_json(post)
+    parsed = parse_post_data(team_post)
 
-            record = BaseRecord[TeamsPostMetadata](
-                text=parsed.text,
-                metadata=TeamsPostMetadata(
-                    user_id=parsed.metadata.user_id,
-                    date=parsed.metadata.date
-                )
+    record = BaseRecord[TeamsPostMetadata](
+        text=parsed.text,
+        metadata=TeamsPostMetadata(
+            user_id=parsed.metadata.user_id,
+            date=parsed.metadata.date
+        )
+    )
+    docs.append(record)
+
+    for reply in team_post.replies or []:
+        parsed_reply = parse_post_data(
+            data=reply,
+            is_reply=True,
+            post_content=team_post.content
+        )
+        reply_record = BaseRecord[TeamsPostMetadata](
+            text=parsed_reply.text,
+            metadata=TeamsPostMetadata(
+                user_id=parsed_reply.metadata.user_id,
+                date=parsed_reply.metadata.date
             )
-            docs.append(record)
-
-            for reply in post.replies or []:
-                parsed_reply = parse_json(
-                    data=reply,
-                    is_reply=True,
-                    post_content=post.content
-                )
-                reply_record = BaseRecord[TeamsPostMetadata](
-                    text=parsed_reply.text,
-                    metadata=TeamsPostMetadata(
-                        user_id=parsed_reply.metadata.user_id,
-                        date=parsed_reply.metadata.date
-                    )
-                )
-                docs.append(reply_record)
+        )
+        docs.append(reply_record)
 
     return docs
 
 
-def parse_json(
+def parse_post_data(
     data: Union[PostEntry, ReplyEntry],
     is_reply: bool = False,
     post_content: str = None

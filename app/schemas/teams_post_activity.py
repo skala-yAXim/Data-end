@@ -19,8 +19,3 @@ class PostEntry(BaseModel):
   attachments: Optional[List[str]]
   application_content: Optional[List[str]]
   date: datetime
-  
-class TeamPost(BaseModel):
-  team_id: str
-  team_name: str
-  posts: Optional[List[PostEntry]]
