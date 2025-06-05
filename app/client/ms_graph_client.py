@@ -1,10 +1,12 @@
 from datetime import datetime, timezone
-from typing import List
+import os
+from typing import List, Optional
 from msal import ConfidentialClientApplication
 import requests
 from dateutil.parser import parse
 
-from app.common.utils import extract_text_values
+from app.common.utils import extract_text_from_json
+from app.schemas.docs_activity import DocsEntry
 from app.schemas.teams_post_activity import PostEntry, ReplyEntry
 
 def get_access_token(client_id: str, client_secret: str, tenant_id: str):
@@ -42,6 +44,15 @@ def get_user_email(user_id: str, access_token: str) -> str:
         return data.get("mail") or data.get("userPrincipalName") or "알 수 없음"
     else:
         return "알 수 없음"
+
+def get_drive_id(access_token: str, site_id: str) -> str:
+    url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json().get("id")
+    else:
+        raise Exception(f"드라이브 ID 조회 실패: {response.status_code} - {response.text}")
 
 def fetch_all_teams(token: str):
     endpoint = "https://graph.microsoft.com/v1.0/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')"
@@ -172,7 +183,7 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
                     # Adaptive Card 내용 처리
                     attachment_content = att.get("content", "")
                     if content:
-                        application_content = extract_text_values(attachment_content)
+                        application_content = extract_text_from_json(attachment_content)
                 else:
                     # 일반 파일 첨부 처리
                     name = att.get("name")
@@ -198,3 +209,100 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
         url = data.get("@odata.nextLink")
 
     return posts
+
+def fetch_all_sites(access_token: str) -> List[dict]:
+    url = "https://graph.microsoft.com/v1.0/sites?search=*"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code != 200:
+        raise Exception(f"사이트 목록 조회 실패: {response.status_code} - {response.text}")
+    
+    return response.json().get("value", [])
+
+def fetch_drive_files(access_token: str, drive_id: str, folder_id: Optional[str] = None) -> List[DocsEntry]:
+    entries: List[DocsEntry] = []
+
+    # 폴더 경로 설정
+    if folder_id:
+        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{folder_id}/children"
+    else:
+        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root/children"
+
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = requests.get(url, headers=headers)
+
+    if response.status_code != 200:
+        raise Exception(f"파일 목록 조회 실패: {response.status_code} - {response.text}")
+
+    data = response.json().get("value", [])
+
+    for item in data:
+        filename = item.get("name")
+        size = item.get("size", 0)
+        last_modified = item.get("lastModifiedDateTime")
+        url_link = item.get("webUrl", "")
+        file_type = (
+            item.get("file", {}).get("mimeType") if "file" in item
+            else "folder" if "folder" in item else "unknown"
+        )
+        file_id = item.get("id", "unknown")
+
+
+        authors = set()
+
+        # 작성자 정보
+        created_by = item.get("createdBy", {}).get("user", {})
+        if created_by:
+            email = created_by.get("email") or created_by.get("displayName", "알 수 없음")
+            authors.add(email)
+
+        # 파일 버전 기록 확인
+        if "file" in item:
+            versions_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item['id']}/versions"
+            versions_response = requests.get(versions_url, headers=headers)
+
+            if versions_response.status_code == 200:
+                versions = versions_response.json().get("value", [])
+                for version in versions:
+                    modified_by = version.get("lastModifiedBy", {}).get("user", {})
+                    if modified_by:
+                        email = modified_by.get("email") or modified_by.get("displayName", "알 수 없음")
+                        authors.add(email)
+
+        # 폴더면 재귀적으로 내부 파일 가져오기
+        if "folder" in item:
+            folder_items = fetch_drive_files(access_token, drive_id, item["id"])
+            entries.extend(folder_items)
+        else:
+            entry = DocsEntry(
+                filename=filename,
+                author=list(authors),
+                last_modified=datetime.fromisoformat(last_modified.replace("Z", "+00:00")) if last_modified else None,
+                type=file_type,
+                size=size,
+                file_id=file_id,
+                drive_id=drive_id
+            )
+            entries.append(entry)
+
+    return entries
+
+def download_file_from_graph(drive_id: str, file_id: str, filename: str, access_token: str) -> str:
+    import tempfile
+
+    tmp_dir = tempfile.mkdtemp(prefix="docs_dl_")
+    file_path = os.path.join(tmp_dir, filename)
+
+    download_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{file_id}/content"
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    response = requests.get(download_url, headers=headers)
+    if response.status_code != 200:
+        raise Exception(f"파일 다운로드 실패: {response.status_code} - {response.text}")
+
+    with open(file_path, "wb") as f:
+        f.write(response.content)
+
+    return file_path

@@ -1,7 +1,7 @@
 from typing import List
 from app.client.ms_graph_client import fetch_all_teams, fetch_channel_posts, fetch_channels, get_access_token
 from app.common.config import MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_TENANT_ID, TEAMS_COLLECTION_NAME
-from app.extractor.teams_post_extractor import extract_texts_from_posts_data
+from app.extractor.teams_post_extractor import create_record_from_post_entry
 from app.schemas.teams_post_activity import PostEntry
 from app.vectordb.uploader import upload_data_to_db
 
@@ -37,7 +37,7 @@ async def save_teams_posts_data():
     
     records = []
     for team_post in all_team_posts:
-        preprocessed_docs = extract_texts_from_posts_data(team_post)
+        preprocessed_docs = create_record_from_post_entry(team_post)
         records.extend(preprocessed_docs)
     
     upload_data_to_db(collection_name=TEAMS_COLLECTION_NAME, records=records)

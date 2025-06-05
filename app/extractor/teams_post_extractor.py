@@ -3,8 +3,7 @@ from app.common.utils import clean_html
 from app.schemas.teams_post_activity import PostEntry, ReplyEntry
 from app.vectordb.schema import BaseRecord, TeamsPostMetadata
 
-
-def extract_texts_from_posts_data(team_post: PostEntry) -> List[BaseRecord[TeamsPostMetadata]]:
+def create_record_from_post_entry(team_post: PostEntry) -> List[BaseRecord[TeamsPostMetadata]]:
     docs: List[BaseRecord[TeamsPostMetadata]] = []
 
     parsed = parse_post_data(team_post)

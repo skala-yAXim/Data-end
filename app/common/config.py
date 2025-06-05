@@ -14,3 +14,5 @@ EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME")
 
 # Collection Name
 TEAMS_COLLECTION_NAME = "Teams-Posts"
+DOCS_COLLECTION_NAME = "Documents"
+GIT_COLLECTION_NAME = "Git-Activities"
