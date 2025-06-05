@@ -4,9 +4,9 @@ from typing import List, Optional
 from msal import ConfidentialClientApplication
 import requests
 from dateutil.parser import parse
-
 from app.common.utils import extract_text_from_json
 from app.schemas.docs_activity import DocsEntry
+from app.schemas.email_activity import EmailEntry
 from app.schemas.teams_post_activity import PostEntry, ReplyEntry
 
 def get_access_token(client_id: str, client_secret: str, tenant_id: str):
@@ -306,3 +306,117 @@ def download_file_from_graph(drive_id: str, file_id: str, filename: str, access_
         f.write(response.content)
 
     return file_path
+
+def fetch_user_email_ids(token: str) -> List[str]:
+    endpoint = "https://graph.microsoft.com/v1.0/users"
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+
+    response = requests.get(endpoint, headers=headers)
+    if response.status_code == 200:
+        users = response.json()
+        emails = [user.get('userPrincipalName') for user in users.get("value", [])]
+        return emails
+    else:
+        print(f"API 요청 실패: {response.status_code}")
+        print(response.text)
+        return []
+
+def fetch_user_inbox_emails(token: str, user_email: str) -> List[EmailEntry]:
+    endpoint = f"https://graph.microsoft.com/v1.0/users/{user_email}/mailFolders/Inbox/messages?$expand=attachments"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Prefer": 'outlook.body-content-type="text"'  # HTML 대신 plain text로 가져오도록 요청
+    }
+
+    response = requests.get(endpoint, headers=headers)
+
+    if response.status_code == 200:
+        messages = response.json().get("value", [])
+        results: List[EmailEntry] = []
+
+        for msg in messages:
+            sender = msg.get("from", {}).get("emailAddress", {}).get("address", "")
+            receiver = msg.get("toRecipients", [{}])[0].get("emailAddress", {}).get("address", "")
+            subject = msg.get("subject", "")
+            content = msg.get("body", {}).get("content", "")
+            date = msg.get("receivedDateTime", "")
+            conversation_id = msg.get("conversation_id", "")
+            attachments = msg.get("attachments", [])
+
+            # 수신일자 문자열을 datetime으로 변환
+            try:
+                parsed_date = datetime.fromisoformat(date.rstrip('Z'))
+            except Exception:
+                parsed_date = datetime.now(timezone.utc)
+
+            attachment_list = [att.get("name", "") for att in attachments if att.get("@odata.type") != "#microsoft.graph.itemAttachment"]
+
+            email_entry = EmailEntry(
+                author=user_email,
+                sender=sender,
+                receiver=receiver,
+                subject=subject,
+                content=content,
+                date=parsed_date,
+                conversation_id=conversation_id,
+                attachment_list=attachment_list if attachment_list else None
+            )
+            results.append(email_entry)
+
+        return results
+
+    else:
+        print(f"API 요청 실패: {response.status_code}")
+        print(response.text)
+        return []
+
+def fetch_user_sent_emails(token: str, user_email: str) -> List[EmailEntry]:
+    endpoint = f"https://graph.microsoft.com/v1.0/users/{user_email}/mailFolders/SentItems/messages?$expand=attachments"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Prefer": 'outlook.body-content-type="text"'  # HTML 대신 plain text로 가져오도록 요청
+    }
+
+    response = requests.get(endpoint, headers=headers)
+
+    if response.status_code == 200:
+        messages = response.json().get("value", [])
+        results: List[EmailEntry] = []
+
+        for msg in messages:
+            sender = msg.get("from", {}).get("emailAddress", {}).get("address", "")
+            receiver = msg.get("toRecipients", [{}])[0].get("emailAddress", {}).get("address", "")
+            subject = msg.get("subject", "")
+            content = msg.get("body", {}).get("content", "")
+            date = msg.get("receivedDateTime", "")
+            conversation_id = msg.get("conversationId", "")
+            attachments = msg.get("attachments", [])
+
+            # 수신일자 문자열을 datetime으로 변환
+            try:
+                parsed_date = datetime.fromisoformat(date.rstrip('Z'))
+            except Exception:
+                parsed_date = datetime.now(timezone.utc)
+
+            attachment_list = [att.get("name", "") for att in attachments if att.get("@odata.type") != "#microsoft.graph.itemAttachment"]
+
+            email_entry = EmailEntry(
+                author=user_email,
+                sender=sender,
+                receiver=receiver,
+                subject=subject,
+                content=content,
+                date=parsed_date,
+                conversation_id=conversation_id,
+                attachment_list=attachment_list if attachment_list else None
+            )
+            results.append(email_entry)
+
+        return results
+
+    else:
+        print(f"API 요청 실패: {response.status_code}")
+        print(response.text)
+        return []
