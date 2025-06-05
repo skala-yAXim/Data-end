@@ -57,11 +57,12 @@ async def save_docs_data():
                 os.rmdir(os.path.dirname(file_path))
             except Exception:
                 pass
+        
         if content is None:
             content = ""  # 빈 문자열로 대체하거나 continue 할 수도 있음
         
-        record = create_record_from_entry(content, doc)
-        records.append(record)
+        record_list = create_record_from_entry(content, doc)
+        records.extend(record_list)
     
     upload_data_to_db(collection_name=DOCS_COLLECTION_NAME, records=records)
         

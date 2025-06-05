@@ -4,6 +4,9 @@ import re
 from docx import Document
 import pandas as pd
 
+from typing import List
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
 def clean_html(raw_html):
     return re.sub(r'<[^>]+>', '', raw_html)
   
@@ -86,3 +89,7 @@ def extract_from_txt(file_path: str) -> str:
     
     # 모든 인코딩 실패 시
     return "텍스트 파일 인코딩 오류"
+
+def split_into_chunks(text: str, chunk_size: int = 500, chunk_overlap: int = 50) -> List[str]:
+    splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    return splitter.split_text(text)
