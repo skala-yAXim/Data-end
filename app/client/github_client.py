@@ -1,20 +1,12 @@
-import requests
-import time
-from cryptography.hazmat.primitives import serialization
-import jwt
-import httpx
 from base64 import b64decode
-from typing import List, Tuple, Optional
+import time
+from typing import List, Optional, Tuple
+from cryptography.hazmat.primitives import serialization
+import httpx
+import jwt
+import requests
 
-from app.schemas.github_activity import (
-    CommitEntry,
-    PullRequestEntry,
-    IssueEntry,
-    ReadmeInfo
-)
-from app.core.config import GITHUB_APP_ID, GITHUB_PRIVATE_KEY_PATH
-from app.vectordb.schema import BaseRecord, GitCommitMetadata, GitIssueMetadata, GitPRMetadata
-from app.vectordb.uploader import upload_data_to_db
+from app.schemas.github_activity import CommitEntry, IssueEntry, PullRequestEntry, ReadmeInfo
 
 BASE_URL = "https://api.github.com"
 
@@ -45,10 +37,6 @@ def create_jwt_token(app_id: str, private_key) -> str:
     return token
 
 def get_installation_access_token(jwt_token: str):
-    """
-    GitHub App JWT 토큰을 이용해 설치된 Installation ID를 조회하고,
-    해당 Installation에 대한 Access Token을 발급받아 반환합니다.
-    """
     headers = {
         "Authorization": f"Bearer {jwt_token}",
         "Accept": "application/vnd.github+json"
@@ -79,6 +67,19 @@ def get_headers(access_token: str):
         "Authorization": f"Bearer {access_token}",
         "Accept": "application/vnd.github+json"
     }
+
+async def fetch_repositories(access_token: str) -> List[Tuple[str, str]]:
+    url = f"{BASE_URL}/installation/repositories"
+
+    async with httpx.AsyncClient() as client:
+        res = await client.get(url, headers=get_headers(access_token))
+        res.raise_for_status()
+
+        data = res.json()
+        return [
+            (repo["owner"]["login"], repo["name"])
+            for repo in data.get("repositories", [])
+        ]
 
 async def fetch_user_email(username: str, access_token: str, client: httpx.AsyncClient) -> Optional[str]:
     """
@@ -240,110 +241,3 @@ async def fetch_readme(owner: str, repo: str, access_token: str) -> Optional[Rea
     except Exception as e:
         print(f"Unexpected error occurred while fetching README: {e}")
         return None
-
-async def save_all_data_for_repo(owner: str, repo: str, access_token: str):
-    collection_name = "Git-Activities"
-    commits = await fetch_all_branch_commits(owner, repo, access_token)
-    commit_records = [extract_record_from_commit_entry(commit) for commit in commits]
-    if commit_records:
-        upload_data_to_db(collection_name=collection_name, records=commit_records)
-    else:
-        print("커밋 데이터 없음. 업로드 생략.")
-    
-    prs = await fetch_pull_requests(owner, repo, access_token)
-    pr_records = [extract_record_from_pull_request_entry(pr) for pr in prs]
-    if pr_records:
-        upload_data_to_db(collection_name=collection_name, records=pr_records)
-    else:
-        print("PR 데이터 없음. 업로드 생략.")
-    
-    issues = await fetch_issues(owner, repo, access_token)
-    issue_records = [extract_record_from_issue_entry(issue) for issue in issues]
-    if issue_records:
-        upload_data_to_db(collection_name=collection_name, records=issue_records)
-    else:
-        print("이슈 데이터 없음. 업로드 생략.")
-    
-    readme = await fetch_readme(owner, repo, access_token)
-    
-    return {
-        "repo": f"{owner}/{repo}",
-        "commits": commits,
-        "pull_requests": prs,
-        "issues": issues,
-        "readme": readme
-    }
-
-async def fetch_repositories(access_token: str) -> List[Tuple[str, str]]:
-    url = f"{BASE_URL}/installation/repositories"
-
-    async with httpx.AsyncClient() as client:
-        res = await client.get(url, headers=get_headers(access_token))
-        res.raise_for_status()
-
-        data = res.json()
-        return [
-            (repo["owner"]["login"], repo["name"])
-            for repo in data.get("repositories", [])
-        ]
-
-async def save_github_data():
-    # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정
-    private_key = load_private_key(GITHUB_PRIVATE_KEY_PATH)
-    jwt_token = create_jwt_token(GITHUB_APP_ID, private_key)
-    access_token = get_installation_access_token(jwt_token)
-    
-    repos = await fetch_repositories(access_token=access_token)
-    
-    results = []
-    for owner, repo in repos:
-        result = await save_all_data_for_repo(owner, repo, access_token)
-        results.append(result)
-
-    return results
-
-
-def extract_record_from_commit_entry(
-    commit_entry: CommitEntry,
-) -> BaseRecord[GitCommitMetadata]:
-    return BaseRecord[GitCommitMetadata](
-        text=(commit_entry.message or "").strip(),
-        metadata=GitCommitMetadata(
-            author=commit_entry.author or "unknown",
-            date=commit_entry.date,
-            type="commit",
-            repo_name=commit_entry.repo,
-            sha=commit_entry.sha
-        )
-    )
-
-def extract_record_from_pull_request_entry(
-    pr_entry: PullRequestEntry,
-) -> BaseRecord[GitPRMetadata]:
-    return BaseRecord[GitPRMetadata](
-        text=((pr_entry.title or "") + "\n\n" + (pr_entry.content or "")).strip(),
-        metadata=GitPRMetadata(
-            author=pr_entry.author or "unknown",
-            date=pr_entry.created_at,
-            type="pull_request",
-            repo_name=pr_entry.repo,
-            number=pr_entry.number,
-            state=pr_entry.state
-        )
-    )
-
-def extract_record_from_issue_entry(
-    issue_entry: IssueEntry,
-) -> BaseRecord[GitIssueMetadata]:
-    return BaseRecord[GitIssueMetadata](
-        text=(issue_entry.title or "").strip(),
-        metadata=GitIssueMetadata(
-            author=issue_entry.author or "unknown",
-            date=issue_entry.created_at,
-            type="issue",
-            repo_name=issue_entry.repo,
-            number=issue_entry.number
-        )
-    )
-
-
