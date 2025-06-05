@@ -2,8 +2,7 @@ import json
 import re
 
 from docx import Document
-import pandas as pd
-
+from openpyxl import load_workbook
 from typing import List
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -52,28 +51,29 @@ def extract_from_docx(file_path: str) -> str:
     
     return "\n".join(text_parts)
 
-def extract_from_xlsx(file_path: str) -> str:
+def extract_from_xlsx(file_path: str) -> List[str]:
     """XLSX 파일에서 텍스트 추출"""
-    text_parts = []
-    
-    # 모든 시트 읽기
-    excel_file = pd.ExcelFile(file_path)
-    for sheet_name in excel_file.sheet_names:
-        df = pd.read_excel(file_path, sheet_name=sheet_name)
-        
-        text_parts.append(f"[시트: {sheet_name}]")
-        
-        # 컬럼명 추가
-        if not df.empty:
-            text_parts.append("컬럼: " + " | ".join(str(col) for col in df.columns))
+    wb = load_workbook(file_path, data_only=True)
+    texts = []
+
+    for sheet in wb.sheetnames:
+        ws = wb[sheet]
+        lines = [f"[시트: {sheet}]"]
+
+        for row in ws.iter_rows():
+            row_cells = []
+            for cell in row:
+                val = cell.value
+                text = str(val) if val is not None else ""
+                row_cells.append(text)
             
-            # 데이터 행 추가 (최대 100행)
-            for idx, row in df.head(100).iterrows():
-                row_text = " | ".join(str(val) for val in row.values if pd.notna(val))
-                if row_text.strip():
-                    text_parts.append(row_text)
-    
-    return "\n".join(text_parts)
+            # 빈 행은 제외
+            if any(cell.strip() for cell in row_cells):
+                lines.append(" | ".join(row_cells))
+
+        texts.append("\n".join(lines))
+
+    return texts
 
 
 def extract_from_txt(file_path: str) -> str:
