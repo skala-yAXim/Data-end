@@ -18,6 +18,7 @@ class DocumentMetadata(BaseMetadata):
   last_modified: datetime
   type: str
   size: int
+  chunk_id: int
   
 class GitCommitMetadata(BaseMetadata):
   author: str

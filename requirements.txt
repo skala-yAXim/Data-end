@@ -6,8 +6,9 @@ numpy==1.26.4
 
 pydantic==2.7.1  # FastAPI 0.110.x는 Pydantic v2 지원
 
+langchain==0.1.17
+
 qdrant-client>=1.0.0
-langchain-qdrant>=0.0.1
 sentence-transformers==2.6.1
 
 # GitHub App 인증용 JWT 생성 및 PEM 키 처리를 위한 라이브러리
