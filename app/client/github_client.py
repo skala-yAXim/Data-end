@@ -104,6 +104,7 @@ async def fetch_user_email(username: str, access_token: str, client: httpx.Async
 async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, limit_per_branch: int = 5) -> List[CommitEntry]:
     branches_url = f"{BASE_URL}/repos/{owner}/{repo}/branches"
     commits = []
+    seen_shas = set()  # 중복 방지용 SHA 저장소
 
     async with httpx.AsyncClient() as client:
         try:
@@ -121,14 +122,19 @@ async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, lim
                 res_commits.raise_for_status()
 
                 for item in res_commits.json():
+                    sha = item["sha"]
+                    if sha in seen_shas:
+                        continue  # 중복된 커밋은 무시
+
+                    seen_shas.add(sha)
+
                     commit = item["commit"]
                     author_name = commit["author"]["email"] if commit.get("author") else None
-                    
                     author_name = GIT.get(author_name, author_name)
 
                     commits.append(CommitEntry(
                         repo=f"{owner}/{repo}",
-                        sha=item["sha"],
+                        sha=sha,
                         message=commit.get("message"),
                         date=commit["author"]["date"],
                         author=author_name
