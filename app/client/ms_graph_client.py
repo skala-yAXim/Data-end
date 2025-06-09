@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import os
+import re
 from typing import List, Optional
 from msal import ConfidentialClientApplication
 import requests
@@ -8,6 +9,7 @@ from app.common.utils import extract_text_from_json
 from app.schemas.docs_activity import DocsEntry
 from app.schemas.email_activity import EmailEntry
 from app.schemas.teams_post_activity import PostEntry, ReplyEntry
+from data import EMAIL
 
 def get_access_token(client_id: str, client_secret: str, tenant_id: str):
     # Graph API 설정
@@ -192,8 +194,10 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
 
             replies: List[ReplyEntry] = fetch_replies_for_message(token, team_id, channel_id, item["id"])
 
-            # replies 필드는 API에서 바로 안 오므로 별도 호출이 필요할 수 있음 (간략화된 버전)
-            # 실제 사용 시에는 메시지 ID로 별도 replies endpoint 호출
+            if author == "Jira Cloud" and application_content[0]:
+                match = re.match(r"([^\s]+)\s", application_content[0])
+                if match:
+                    author = EMAIL.get(match.group(1), author)
 
             posts.append(PostEntry(
                 author=author,
