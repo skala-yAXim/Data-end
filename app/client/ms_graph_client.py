@@ -1,0 +1,422 @@
+from datetime import datetime, timezone
+import os
+from typing import List, Optional
+from msal import ConfidentialClientApplication
+import requests
+from dateutil.parser import parse
+from app.common.utils import extract_text_from_json
+from app.schemas.docs_activity import DocsEntry
+from app.schemas.email_activity import EmailEntry
+from app.schemas.teams_post_activity import PostEntry, ReplyEntry
+
+def get_access_token(client_id: str, client_secret: str, tenant_id: str):
+    # Graph API 설정
+    authority = f"https://login.microsoftonline.com/{tenant_id}"
+    scope = ["https://graph.microsoft.com/.default"]
+
+    # MSAL 앱 초기화
+    app = ConfidentialClientApplication(
+        client_id,
+        authority=authority,
+        client_credential=client_secret
+    )
+
+    # 액세스 토큰 요청
+    result = app.acquire_token_for_client(scopes=scope)
+
+    if "access_token" in result:
+        return result["access_token"]
+    else:
+        # 에러 메시지 출력
+        error = result.get("error", "unknown_error")
+        error_description = result.get("error_description", "No description provided.")
+        raise Exception(f"토큰 요청 실패: {error} - {error_description}")
+
+def get_user_email(user_id: str, access_token: str) -> str:
+    url = f"https://graph.microsoft.com/v1.0/users/{user_id}"
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+    }
+
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        data = response.json()
+        return data.get("mail") or data.get("userPrincipalName") or "알 수 없음"
+    else:
+        return "알 수 없음"
+
+def get_drive_id(access_token: str, site_id: str) -> str:
+    url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json().get("id")
+    else:
+        raise Exception(f"드라이브 ID 조회 실패: {response.status_code} - {response.text}")
+
+def fetch_all_teams(token: str):
+    endpoint = "https://graph.microsoft.com/v1.0/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json"
+    }
+    
+    teams = []
+    url = endpoint
+
+    while url:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            teams.extend(data.get("value", []))
+            url = data.get("@odata.nextLink")  # 페이징 처리
+        else:
+            raise Exception(f"팀 목록 조회 실패: {response.status_code} {response.text}")
+    
+    return teams
+
+def fetch_channels(token: str, team_id: str):
+    endpoint = f"https://graph.microsoft.com/v1.0/teams/{team_id}/channels"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json"
+    }
+    response = requests.get(endpoint, headers=headers)
+    if response.status_code == 200:
+        return response.json().get("value", [])
+    else:
+        raise Exception(f"채널 조회 실패: {response.status_code} {response.text}")
+
+def fetch_replies_for_message(token: str, team_id: str, channel_id: str, message_id: str) -> List[ReplyEntry]:
+    endpoint = f"https://graph.microsoft.com/v1.0/teams/{team_id}/channels/{channel_id}/messages/{message_id}/replies"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json"
+    }
+
+    response = requests.get(endpoint, headers=headers)
+    replies: List[ReplyEntry] = []
+
+    if response.status_code == 200:
+        reply_data = response.json().get("value", [])
+        for reply in reply_data:
+            reply_author_id = reply.get("from", {}).get("user", {}).get("id", "알 수 없음")
+            reply_author = get_user_email(reply_author_id, token)
+            reply_content = reply.get("body", {}).get("content", "")
+            reply_date_str = reply.get("createdDateTime", "")
+            try:
+                reply_date = parse(reply_date_str) if reply_date_str else datetime.now(timezone.utc)
+            except:
+                reply_date = datetime.now(timezone.utc)
+            reply_attachments = [
+                att.get("name")
+                for att in reply.get("attachments", [])
+                if att.get("name") is not None
+            ]
+
+            replies.append(ReplyEntry(
+                author=reply_author,
+                content=reply_content,
+                date=reply_date,
+                attachments=reply_attachments if reply_attachments else []
+            ))
+    else:
+        print(f"댓글 조회 실패: {response.status_code}")
+        print(response.text)
+
+    return replies
+
+def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostEntry]:
+    endpoint = f"https://graph.microsoft.com/v1.0/teams/{team_id}/channels/{channel_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json"
+    }
+
+    posts: List[PostEntry] = []
+    url = endpoint
+
+    while url:
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            print(f"메시지 조회 실패 (팀:{team_id}, 채널:{channel_id}): {response.status_code}")
+            print(response.text)
+            break
+
+        data = response.json()
+        for item in data.get("value", []):
+            # print(item)
+            from_info = item.get("from")
+            if from_info is None:
+                author = "System"
+            else:
+                user_info = from_info.get("user")
+                application_info = from_info.get("application")
+
+                if user_info:
+                    user_id = user_info.get("id")
+                    author = get_user_email(user_id, token) if user_id else "알 수 없음"
+                elif application_info:
+                    author = application_info.get("displayName", "알 수 없음")
+                else:
+                    author = "System"
+            
+            subject = item.get("subject") or ""
+            summary = item.get("summary") or ""       
+            content = item.get("body", {}).get("content", "")
+            date_str = item.get("createdDateTime", "")
+            try:
+                date = parse(date_str) if date_str else datetime.now(timezone.utc)
+            except Exception:
+                date = datetime.now(timezone.utc)
+            
+            
+            attachments_raw = item.get("attachments", [])
+
+            attachments = []
+            application_content = None
+
+            for att in attachments_raw:
+                content_type = att.get("contentType")
+                
+                if content_type == "application/vnd.microsoft.card.adaptive":
+                    # Adaptive Card 내용 처리
+                    attachment_content = att.get("content", "")
+                    if content:
+                        application_content = extract_text_from_json(attachment_content)
+                else:
+                    # 일반 파일 첨부 처리
+                    name = att.get("name")
+                    if name:
+                        attachments.append(name)
+
+            replies: List[ReplyEntry] = fetch_replies_for_message(token, team_id, channel_id, item["id"])
+
+            # replies 필드는 API에서 바로 안 오므로 별도 호출이 필요할 수 있음 (간략화된 버전)
+            # 실제 사용 시에는 메시지 ID로 별도 replies endpoint 호출
+
+            posts.append(PostEntry(
+                author=author,
+                subject=subject,
+                summary=summary,
+                content=content,
+                date=date,
+                attachments=attachments if attachments else [],
+                application_content=application_content,
+                replies=replies
+            ))
+
+        url = data.get("@odata.nextLink")
+
+    return posts
+
+def fetch_all_sites(access_token: str) -> List[dict]:
+    url = "https://graph.microsoft.com/v1.0/sites?search=*"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code != 200:
+        raise Exception(f"사이트 목록 조회 실패: {response.status_code} - {response.text}")
+    
+    return response.json().get("value", [])
+
+def fetch_drive_files(access_token: str, drive_id: str, folder_id: Optional[str] = None) -> List[DocsEntry]:
+    entries: List[DocsEntry] = []
+
+    # 폴더 경로 설정
+    if folder_id:
+        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{folder_id}/children"
+    else:
+        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root/children"
+
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = requests.get(url, headers=headers)
+
+    if response.status_code != 200:
+        raise Exception(f"파일 목록 조회 실패: {response.status_code} - {response.text}")
+
+    data = response.json().get("value", [])
+
+    for item in data:
+        filename = item.get("name")
+        size = item.get("size", 0)
+        last_modified = item.get("lastModifiedDateTime")
+        url_link = item.get("webUrl", "")
+        file_type = (
+            item.get("file", {}).get("mimeType") if "file" in item
+            else "folder" if "folder" in item else "unknown"
+        )
+        file_id = item.get("id", "unknown")
+
+
+        authors = set()
+
+        # 작성자 정보
+        created_by = item.get("createdBy", {}).get("user", {})
+        if created_by:
+            email = created_by.get("email") or created_by.get("displayName", "알 수 없음")
+            authors.add(email)
+
+        # 파일 버전 기록 확인
+        if "file" in item:
+            versions_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{item['id']}/versions"
+            versions_response = requests.get(versions_url, headers=headers)
+
+            if versions_response.status_code == 200:
+                versions = versions_response.json().get("value", [])
+                for version in versions:
+                    modified_by = version.get("lastModifiedBy", {}).get("user", {})
+                    if modified_by:
+                        email = modified_by.get("email") or modified_by.get("displayName", "알 수 없음")
+                        authors.add(email)
+
+        # 폴더면 재귀적으로 내부 파일 가져오기
+        if "folder" in item:
+            folder_items = fetch_drive_files(access_token, drive_id, item["id"])
+            entries.extend(folder_items)
+        else:
+            entry = DocsEntry(
+                filename=filename,
+                author=list(authors),
+                last_modified=datetime.fromisoformat(last_modified.replace("Z", "+00:00")) if last_modified else None,
+                type=file_type,
+                size=size,
+                file_id=file_id,
+                drive_id=drive_id
+            )
+            entries.append(entry)
+
+    return entries
+
+def download_file_from_graph(drive_id: str, file_id: str, filename: str, access_token: str) -> str:
+    import tempfile
+
+    tmp_dir = tempfile.mkdtemp(prefix="docs_dl_")
+    file_path = os.path.join(tmp_dir, filename)
+
+    download_url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{file_id}/content"
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    response = requests.get(download_url, headers=headers)
+    if response.status_code != 200:
+        raise Exception(f"파일 다운로드 실패: {response.status_code} - {response.text}")
+
+    with open(file_path, "wb") as f:
+        f.write(response.content)
+
+    return file_path
+
+def fetch_user_email_ids(token: str) -> List[str]:
+    endpoint = "https://graph.microsoft.com/v1.0/users"
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+
+    response = requests.get(endpoint, headers=headers)
+    if response.status_code == 200:
+        users = response.json()
+        emails = [user.get('userPrincipalName') for user in users.get("value", [])]
+        return emails
+    else:
+        print(f"API 요청 실패: {response.status_code}")
+        print(response.text)
+        return []
+
+def fetch_user_inbox_emails(token: str, user_email: str) -> List[EmailEntry]:
+    endpoint = f"https://graph.microsoft.com/v1.0/users/{user_email}/mailFolders/Inbox/messages?$expand=attachments"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Prefer": 'outlook.body-content-type="text"'  # HTML 대신 plain text로 가져오도록 요청
+    }
+
+    response = requests.get(endpoint, headers=headers)
+
+    if response.status_code == 200:
+        messages = response.json().get("value", [])
+        results: List[EmailEntry] = []
+
+        for msg in messages:
+            sender = msg.get("from", {}).get("emailAddress", {}).get("address", "")
+            receiver = msg.get("toRecipients", [{}])[0].get("emailAddress", {}).get("address", "")
+            subject = msg.get("subject", "")
+            content = msg.get("body", {}).get("content", "")
+            date = msg.get("receivedDateTime", "")
+            conversation_id = msg.get("conversation_id", "")
+            attachments = msg.get("attachments", [])
+
+            # 수신일자 문자열을 datetime으로 변환
+            try:
+                parsed_date = datetime.fromisoformat(date.rstrip('Z'))
+            except Exception:
+                parsed_date = datetime.now(timezone.utc)
+
+            attachment_list = [att.get("name", "") for att in attachments if att.get("@odata.type") != "#microsoft.graph.itemAttachment"]
+
+            email_entry = EmailEntry(
+                author=user_email,
+                sender=sender,
+                receiver=receiver,
+                subject=subject,
+                content=content,
+                date=parsed_date,
+                conversation_id=conversation_id,
+                attachment_list=attachment_list if attachment_list else None
+            )
+            results.append(email_entry)
+
+        return results
+
+    else:
+        print(f"API 요청 실패: {response.status_code}")
+        print(response.text)
+        return []
+
+def fetch_user_sent_emails(token: str, user_email: str) -> List[EmailEntry]:
+    endpoint = f"https://graph.microsoft.com/v1.0/users/{user_email}/mailFolders/SentItems/messages?$expand=attachments"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Prefer": 'outlook.body-content-type="text"'  # HTML 대신 plain text로 가져오도록 요청
+    }
+
+    response = requests.get(endpoint, headers=headers)
+
+    if response.status_code == 200:
+        messages = response.json().get("value", [])
+        results: List[EmailEntry] = []
+
+        for msg in messages:
+            sender = msg.get("from", {}).get("emailAddress", {}).get("address", "")
+            receiver = msg.get("toRecipients", [{}])[0].get("emailAddress", {}).get("address", "")
+            subject = msg.get("subject", "")
+            content = msg.get("body", {}).get("content", "")
+            date = msg.get("receivedDateTime", "")
+            conversation_id = msg.get("conversationId", "")
+            attachments = msg.get("attachments", [])
+
+            # 수신일자 문자열을 datetime으로 변환
+            try:
+                parsed_date = datetime.fromisoformat(date.rstrip('Z'))
+            except Exception:
+                parsed_date = datetime.now(timezone.utc)
+
+            attachment_list = [att.get("name", "") for att in attachments if att.get("@odata.type") != "#microsoft.graph.itemAttachment"]
+
+            email_entry = EmailEntry(
+                author=user_email,
+                sender=sender,
+                receiver=receiver,
+                subject=subject,
+                content=content,
+                date=parsed_date,
+                conversation_id=conversation_id,
+                attachment_list=attachment_list if attachment_list else None
+            )
+            results.append(email_entry)
+
+        return results
+
+    else:
+        print(f"API 요청 실패: {response.status_code}")
+        print(response.text)
+        return []

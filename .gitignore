@@ -1,0 +1,63 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Environment variables
+.env
+.env.*
+*.pem
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+pip-selfcheck.json
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+*.iml
+
+# mypy
+.mypy_cache/
+
+# FastAPI auto-generated docs cache
+*.sqlite3
+
+# Log files
+*.log
+
+# OS-specific
+.DS_Store
+Thumbs.db
