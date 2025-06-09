@@ -7,6 +7,7 @@ import jwt
 import requests
 
 from app.schemas.github_activity import CommitEntry, IssueEntry, PullRequestEntry, ReadmeInfo
+from data import GIT
 
 BASE_URL = "https://api.github.com"
 
@@ -122,6 +123,8 @@ async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, lim
                 for item in res_commits.json():
                     commit = item["commit"]
                     author_name = commit["author"]["email"] if commit.get("author") else None
+                    
+                    author_name = GIT.get(author_name, author_name)
 
                     commits.append(CommitEntry(
                         repo=f"{owner}/{repo}",
@@ -158,6 +161,8 @@ async def fetch_pull_requests(owner: str, repo: str, access_token: str) -> List[
 
                 if username:
                     author_email = await fetch_user_email(username, access_token, client)
+                
+                author_email = GIT.get(author_email, author_email)
 
                 result.append(PullRequestEntry(
                     repo=f"{owner}/{repo}",
@@ -197,6 +202,8 @@ async def fetch_issues(owner: str, repo: str, access_token: str) -> List[IssueEn
                 if username:
                     author_email = await fetch_user_email(username, access_token, client)
 
+                author_email = GIT.get(author_email, author_email)
+                
                 issues.append(IssueEntry(
                     repo=f"{owner}/{repo}",
                     number=issue["number"],
