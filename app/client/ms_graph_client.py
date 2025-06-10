@@ -165,7 +165,7 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
             subject = item.get("subject") or ""
             summary = item.get("summary") or ""       
             content = item.get("body", {}).get("content", "")
-            date = convert_utc_to_kst(item.get("createdDateTime", ""))     
+            date = convert_utc_to_kst(item.get("createdDateTime", ""))
             
             attachments_raw = item.get("attachments", [])
 
