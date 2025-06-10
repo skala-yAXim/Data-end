@@ -5,7 +5,10 @@ from app.pipeline.docs_pipeline import save_docs_data
 from app.pipeline.email_pipeline import save_all_email_data
 from app.pipeline.github_pipeline import save_github_data
 from app.pipeline.teams_post_pipeline import save_teams_posts_data
-from fastapi import APIRouter, Request
+from app.rdb.repository import find_all_teams, find_all_users, find_all_team_members, find_all_git_info
+from app.rdb.client import get_db
+from fastapi import APIRouter, Request, Depends
+from sqlalchemy.orm import Session
 from typing import List
 
 router = APIRouter()
@@ -54,3 +57,31 @@ def list_collections(request: Request):
     """
     qdrant = request.app.state.qdrant_client
     return qdrant.get_collections()
+
+@router.get("/team/all")
+def get_all_teams(db: Session = Depends(get_db)):
+    """
+    Teams 게시물에 대한 분석 데이터를 반환합니다.
+    """
+    return find_all_teams(db)
+
+@router.get("/user/all")
+def get_all_users(db: Session = Depends(get_db)):
+    """
+    모든 사용자 정보를 반환합니다.
+    """
+    return find_all_users(db)
+
+@router.get("/team-member/all")
+def get_all_team_members(db: Session = Depends(get_db)):
+    """
+    모든 팀 멤버 정보를 반환합니다.
+    """
+    return find_all_team_members(db)
+
+@router.get("/git-hub/all")
+def get_all_team_members(db: Session = Depends(get_db)):
+    """
+    모든 팀 멤버 정보를 반환합니다.
+    """
+    return find_all_git_info(db)
