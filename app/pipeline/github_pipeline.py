@@ -1,24 +1,29 @@
+from sqlalchemy.orm import Session
 from app.client.github_client import create_jwt_token, fetch_all_branch_commits, fetch_issues, fetch_pull_requests, fetch_readme, fetch_repositories, get_installation_access_token, load_private_key
 from app.extractor.github_activity_extractor import extract_record_from_commit_entry, extract_record_from_issue_entry, extract_record_from_pull_request_entry
 from app.common.config import GIT_COLLECTION_NAME, GITHUB_APP_ID, GITHUB_PRIVATE_KEY_PATH
 from app.vectordb.uploader import upload_data_to_db
+from app.common.cache import app_cache
 
 async def save_all_data_for_repo(owner: str, repo: str, access_token: str):
-    commits = await fetch_all_branch_commits(owner, repo, access_token)
+    git_info = app_cache.git_email
+    git_id = app_cache.git_id
+
+    commits = await fetch_all_branch_commits(owner, repo, access_token, git_info, git_id)
     commit_records = [extract_record_from_commit_entry(commit) for commit in commits]
     if commit_records:
         upload_data_to_db(collection_name=GIT_COLLECTION_NAME, records=commit_records)
     else:
         print("커밋 데이터 없음. 업로드 생략.")
     
-    prs = await fetch_pull_requests(owner, repo, access_token)
+    prs = await fetch_pull_requests(owner, repo, access_token, git_info, git_id)
     pr_records = [extract_record_from_pull_request_entry(pr) for pr in prs]
     if pr_records:
         upload_data_to_db(collection_name=GIT_COLLECTION_NAME, records=pr_records)
     else:
         print("PR 데이터 없음. 업로드 생략.")
     
-    issues = await fetch_issues(owner, repo, access_token)
+    issues = await fetch_issues(owner, repo, access_token, git_info, git_id)
     issue_records = [extract_record_from_issue_entry(issue) for issue in issues]
     if issue_records:
         upload_data_to_db(collection_name=GIT_COLLECTION_NAME, records=issue_records)
@@ -39,17 +44,15 @@ async def save_github_data():
     # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정
     private_key = load_private_key(GITHUB_PRIVATE_KEY_PATH)
     jwt_token = create_jwt_token(GITHUB_APP_ID, private_key)
-    access_token = get_installation_access_token(jwt_token)
-    
-    repos = await fetch_repositories(access_token=access_token)
+    access_tokens = get_installation_access_token(jwt_token) # list로 반환
     
     results = []
-    for owner, repo in repos:
-        result = await save_all_data_for_repo(owner, repo, access_token)
-        results.append(result)
+    
+    for access_token in access_tokens:
+        repos = await fetch_repositories(access_token=access_token)
+        
+        for owner, repo in repos:
+            result = await save_all_data_for_repo(owner, repo, access_token)
+            results.append(result)
 
     return results
-
-
-
-

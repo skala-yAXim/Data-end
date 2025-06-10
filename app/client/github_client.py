@@ -1,4 +1,5 @@
 from base64 import b64decode
+from sqlalchemy.orm import Session
 import time
 from typing import List, Optional, Tuple
 from cryptography.hazmat.primitives import serialization
@@ -7,7 +8,7 @@ import jwt
 import requests
 
 from app.schemas.github_activity import CommitEntry, IssueEntry, PullRequestEntry, ReadmeInfo
-from data import GIT
+from app.common.cache import app_cache
 
 BASE_URL = "https://api.github.com"
 
@@ -37,7 +38,7 @@ def create_jwt_token(app_id: str, private_key) -> str:
     
     return token
 
-def get_installation_access_token(jwt_token: str):
+def get_installation_access_token(jwt_token: str) -> list[str]:
     headers = {
         "Authorization": f"Bearer {jwt_token}",
         "Accept": "application/vnd.github+json"
@@ -51,17 +52,22 @@ def get_installation_access_token(jwt_token: str):
     if not installations:
         raise Exception("No installations found for this GitHub App.")
 
-    # TODO: DB에서 installation id를 가져와서 넣는 방식으로 수정
-    # Installation Access Token 요청
-    access_token_url = f"https://api.github.com/app/installations/68835585/access_tokens"
-    token_response = requests.post(access_token_url, headers=headers)
-    token_response.raise_for_status()
+    teams = app_cache.teams
+    installation_ids = [team.installation_id for team in teams if team.installation_id is not None]
+    access_tokens = []
 
-    access_token = token_response.json().get("token")
-    if not access_token:
-        raise Exception("Failed to obtain installation access token.")
+    for installation_id in installation_ids:
+        access_token_url = f"https://api.github.com/app/installations/{installation_id}/access_tokens"
+        token_response = requests.post(access_token_url, headers=headers)
+        token_response.raise_for_status()
 
-    return access_token
+        access_token = token_response.json().get("token")
+        if not access_token:
+            raise Exception("Failed to obtain installation access token.")
+        
+        access_tokens.append(access_token)
+
+    return access_tokens
 
 def get_headers(access_token: str):
     return {
@@ -101,7 +107,7 @@ async def fetch_user_email(username: str, access_token: str, client: httpx.Async
     
     return None
 
-async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, limit_per_branch: int = 5) -> List[CommitEntry]:
+async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, git_email: dict[str, int], git_id: dict[str, int], limit_per_branch: int = 5) -> List[CommitEntry]:
     branches_url = f"{BASE_URL}/repos/{owner}/{repo}/branches"
     commits = []
     seen_shas = set()  # 중복 방지용 SHA 저장소
@@ -130,7 +136,7 @@ async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, lim
 
                     commit = item["commit"]
                     author_name = commit["author"]["email"] if commit.get("author") else None
-                    author_name = GIT.get(author_name, author_name)
+                    author_name = git_email.get(author_name, 0)
 
                     commits.append(CommitEntry(
                         repo=f"{owner}/{repo}",
@@ -150,7 +156,7 @@ async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, lim
     return commits
 
 
-async def fetch_pull_requests(owner: str, repo: str, access_token: str) -> List[PullRequestEntry]:
+async def fetch_pull_requests(owner: str, repo: str, access_token: str, git_email: dict[str, int], git_id:dict[str, int]) -> List[PullRequestEntry]:
     url = f"{BASE_URL}/repos/{owner}/{repo}/pulls?state=all"
 
     try:
@@ -168,7 +174,10 @@ async def fetch_pull_requests(owner: str, repo: str, access_token: str) -> List[
                 if username:
                     author_email = await fetch_user_email(username, access_token, client)
                 
-                author_email = GIT.get(author_email, author_email)
+                # TODO DB에서 매핑해야함.
+                author_email = git_email.get(author_email, author_email)
+                if not author_email:
+                    author_email = git_id.get(username, 0)
 
                 result.append(PullRequestEntry(
                     repo=f"{owner}/{repo}",
@@ -189,7 +198,7 @@ async def fetch_pull_requests(owner: str, repo: str, access_token: str) -> List[
         return []
 
 
-async def fetch_issues(owner: str, repo: str, access_token: str) -> List[IssueEntry]:
+async def fetch_issues(owner: str, repo: str, access_token: str, git_email: dict[str, int], git_id: dict[str, int]) -> List[IssueEntry]:
     url = f"{BASE_URL}/repos/{owner}/{repo}/issues?state=all"
 
     try:
@@ -208,7 +217,9 @@ async def fetch_issues(owner: str, repo: str, access_token: str) -> List[IssueEn
                 if username:
                     author_email = await fetch_user_email(username, access_token, client)
 
-                author_email = GIT.get(author_email, author_email)
+                author_email = git_email.get(author_email, author_email)
+                if not author_email:
+                    author_email = git_id.get(username, 0)
                 
                 issues.append(IssueEntry(
                     repo=f"{owner}/{repo}",
