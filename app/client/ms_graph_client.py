@@ -1,15 +1,17 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import os
 import re
 from typing import List, Optional
 from msal import ConfidentialClientApplication
 import requests
 from dateutil.parser import parse
-from app.common.utils import extract_text_from_json
+from app.common.utils import convert_utc_to_kst, extract_text_from_json
 from app.schemas.docs_activity import DocsEntry
 from app.schemas.email_activity import EmailEntry
 from app.schemas.teams_post_activity import PostEntry, ReplyEntry
 from data import EMAIL
+
+KST = timezone(timedelta(hours=9))
 
 def get_access_token(client_id: str, client_secret: str, tenant_id: str):
     # Graph API 설정
@@ -105,11 +107,8 @@ def fetch_replies_for_message(token: str, team_id: str, channel_id: str, message
             reply_author_id = reply.get("from", {}).get("user", {}).get("id", "알 수 없음")
             reply_author = get_user_email(reply_author_id, token)
             reply_content = reply.get("body", {}).get("content", "")
-            reply_date_str = reply.get("createdDateTime", "")
-            try:
-                reply_date = parse(reply_date_str) if reply_date_str else datetime.now(timezone.utc)
-            except:
-                reply_date = datetime.now(timezone.utc)
+            reply_date = convert_utc_to_kst(reply.get("createdDateTime", ""))
+            
             reply_attachments = [
                 att.get("name")
                 for att in reply.get("attachments", [])
@@ -166,12 +165,7 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
             subject = item.get("subject") or ""
             summary = item.get("summary") or ""       
             content = item.get("body", {}).get("content", "")
-            date_str = item.get("createdDateTime", "")
-            try:
-                date = parse(date_str) if date_str else datetime.now(timezone.utc)
-            except Exception:
-                date = datetime.now(timezone.utc)
-            
+            date = convert_utc_to_kst(item.get("createdDateTime", ""))     
             
             attachments_raw = item.get("attachments", [])
 
@@ -245,7 +239,7 @@ def fetch_drive_files(access_token: str, drive_id: str, folder_id: Optional[str]
     for item in data:
         filename = item.get("name")
         size = item.get("size", 0)
-        last_modified = item.get("lastModifiedDateTime")
+        last_modified = convert_utc_to_kst(item.get("lastModifiedDateTime"))
         url_link = item.get("webUrl", "")
         file_type = (
             item.get("file", {}).get("mimeType") if "file" in item
@@ -283,7 +277,7 @@ def fetch_drive_files(access_token: str, drive_id: str, folder_id: Optional[str]
             entry = DocsEntry(
                 filename=filename,
                 author=list(authors),
-                last_modified=datetime.fromisoformat(last_modified.replace("Z", "+00:00")) if last_modified else None,
+                last_modified=last_modified,
                 type=file_type,
                 size=size,
                 file_id=file_id,
@@ -345,15 +339,9 @@ def fetch_user_inbox_emails(token: str, user_email: str) -> List[EmailEntry]:
             receiver = msg.get("toRecipients", [{}])[0].get("emailAddress", {}).get("address", "")
             subject = msg.get("subject", "")
             content = msg.get("body", {}).get("content", "")
-            date = msg.get("receivedDateTime", "")
+            date = convert_utc_to_kst(msg.get("receivedDateTime", ""))
             conversation_id = msg.get("conversation_id", "")
             attachments = msg.get("attachments", [])
-
-            # 수신일자 문자열을 datetime으로 변환
-            try:
-                parsed_date = datetime.fromisoformat(date.rstrip('Z'))
-            except Exception:
-                parsed_date = datetime.now(timezone.utc)
 
             attachment_list = [att.get("name", "") for att in attachments if att.get("@odata.type") != "#microsoft.graph.itemAttachment"]
 
@@ -363,7 +351,7 @@ def fetch_user_inbox_emails(token: str, user_email: str) -> List[EmailEntry]:
                 receiver=receiver,
                 subject=subject,
                 content=content,
-                date=parsed_date,
+                date=date,
                 conversation_id=conversation_id,
                 attachment_list=attachment_list if attachment_list else None
             )
@@ -394,15 +382,9 @@ def fetch_user_sent_emails(token: str, user_email: str) -> List[EmailEntry]:
             receiver = msg.get("toRecipients", [{}])[0].get("emailAddress", {}).get("address", "")
             subject = msg.get("subject", "")
             content = msg.get("body", {}).get("content", "")
-            date = msg.get("receivedDateTime", "")
+            date = convert_utc_to_kst(msg.get("receivedDateTime", ""))
             conversation_id = msg.get("conversationId", "")
             attachments = msg.get("attachments", [])
-
-            # 수신일자 문자열을 datetime으로 변환
-            try:
-                parsed_date = datetime.fromisoformat(date.rstrip('Z'))
-            except Exception:
-                parsed_date = datetime.now(timezone.utc)
 
             attachment_list = [att.get("name", "") for att in attachments if att.get("@odata.type") != "#microsoft.graph.itemAttachment"]
 
@@ -412,7 +394,7 @@ def fetch_user_sent_emails(token: str, user_email: str) -> List[EmailEntry]:
                 receiver=receiver,
                 subject=subject,
                 content=content,
-                date=parsed_date,
+                date=date,
                 conversation_id=conversation_id,
                 attachment_list=attachment_list if attachment_list else None
             )

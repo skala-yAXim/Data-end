@@ -93,3 +93,22 @@ def extract_from_txt(file_path: str) -> str:
 def split_into_chunks(text: str, chunk_size: int = 500, chunk_overlap: int = 50) -> List[str]:
     splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     return splitter.split_text(text)
+
+from datetime import datetime, timezone, timedelta
+
+from datetime import datetime, timezone, timedelta
+
+def convert_utc_to_kst(utc_datetime_str: str) -> datetime:
+    """
+    UTC ISO 8601 문자열을 받아 한국 시간(KST) datetime 객체로 반환.
+    빈 문자열이나 파싱 실패 시 현재 KST 시간을 반환.
+    """
+    try:
+        if not utc_datetime_str:
+            raise ValueError("빈 문자열")
+        utc_time = datetime.strptime(utc_datetime_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except Exception:
+        utc_time = datetime.now(timezone.utc)
+
+    kst = timezone(timedelta(hours=9))
+    return utc_time.astimezone(kst)

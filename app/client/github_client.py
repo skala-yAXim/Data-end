@@ -6,6 +6,7 @@ import httpx
 import jwt
 import requests
 
+from app.common.utils import convert_utc_to_kst
 from app.schemas.github_activity import CommitEntry, IssueEntry, PullRequestEntry, ReadmeInfo
 from data import GIT
 
@@ -136,7 +137,7 @@ async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, lim
                         repo=f"{owner}/{repo}",
                         sha=sha,
                         message=commit.get("message"),
-                        date=commit["author"]["date"],
+                        date=convert_utc_to_kst(commit["author"]["date"]),
                         author=author_name
                     ))
 
@@ -175,7 +176,7 @@ async def fetch_pull_requests(owner: str, repo: str, access_token: str) -> List[
                     number=pr["number"],
                     title=pr.get("title"),
                     content=pr.get("body"),
-                    created_at=pr["created_at"],
+                    created_at=convert_utc_to_kst(pr["created_at"]),
                     state=pr["state"],
                     author=author_email or username  # fallback to username
                 ))
@@ -214,7 +215,7 @@ async def fetch_issues(owner: str, repo: str, access_token: str) -> List[IssueEn
                     repo=f"{owner}/{repo}",
                     number=issue["number"],
                     title=issue.get("title"),
-                    created_at=issue["created_at"],
+                    created_at=convert_utc_to_kst(issue["created_at"]),
                     state=issue["state"],
                     author=author_email or username
                 ))
