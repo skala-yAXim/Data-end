@@ -9,7 +9,7 @@ from app.common.utils import extract_text_from_json
 from app.schemas.docs_activity import DocsEntry
 from app.schemas.email_activity import EmailEntry
 from app.schemas.teams_post_activity import PostEntry, ReplyEntry
-from data import EMAIL
+from app.common.cache import app_cache
 
 def get_access_token(client_id: str, client_secret: str, tenant_id: str):
     # Graph API 설정
@@ -104,6 +104,7 @@ def fetch_replies_for_message(token: str, team_id: str, channel_id: str, message
         for reply in reply_data:
             reply_author_id = reply.get("from", {}).get("user", {}).get("id", "알 수 없음")
             reply_author = get_user_email(reply_author_id, token)
+            author = app_cache.user_email.get(reply_author, 0)
             reply_content = reply.get("body", {}).get("content", "")
             reply_date_str = reply.get("createdDateTime", "")
             try:
@@ -117,7 +118,7 @@ def fetch_replies_for_message(token: str, team_id: str, channel_id: str, message
             ]
 
             replies.append(ReplyEntry(
-                author=reply_author,
+                author=author,
                 content=reply_content,
                 date=reply_date,
                 attachments=reply_attachments if reply_attachments else []
@@ -138,6 +139,9 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
     posts: List[PostEntry] = []
     url = endpoint
 
+    user_email = app_cache.user_email
+    user_name = app_cache.user_name
+
     while url:
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
@@ -150,7 +154,7 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
             # print(item)
             from_info = item.get("from")
             if from_info is None:
-                author = "System"
+                author = 0
             else:
                 user_info = from_info.get("user")
                 application_info = from_info.get("application")
@@ -158,10 +162,11 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
                 if user_info:
                     user_id = user_info.get("id")
                     author = get_user_email(user_id, token) if user_id else "알 수 없음"
+                    author = user_email.get(author, 0)
                 elif application_info:
-                    author = application_info.get("displayName", "알 수 없음")
+                    author = application_info.get("displayName", 0)
                 else:
-                    author = "System"
+                    author = 0
             
             subject = item.get("subject") or ""
             summary = item.get("summary") or ""       
@@ -197,7 +202,7 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
             if author == "Jira Cloud" and application_content[0]:
                 match = re.match(r"([^\s]+)\s", application_content[0])
                 if match:
-                    author = EMAIL.get(match.group(1), author)
+                    author = user_name.get(match.group(1), 0)
 
             posts.append(PostEntry(
                 author=author,
@@ -225,7 +230,7 @@ def fetch_all_sites(access_token: str) -> List[dict]:
     
     return response.json().get("value", [])
 
-def fetch_drive_files(access_token: str, drive_id: str, folder_id: Optional[str] = None) -> List[DocsEntry]:
+def fetch_drive_files(access_token: str, drive_id: str, user_info: dict[str, int], folder_id: Optional[str] = None) -> List[DocsEntry]:
     entries: List[DocsEntry] = []
 
     # 폴더 경로 설정
@@ -260,7 +265,8 @@ def fetch_drive_files(access_token: str, drive_id: str, folder_id: Optional[str]
         created_by = item.get("createdBy", {}).get("user", {})
         if created_by:
             email = created_by.get("email") or created_by.get("displayName", "알 수 없음")
-            authors.add(email)
+            user_id = user_info.get(email, 0)
+            authors.add(user_id)
 
         # 파일 버전 기록 확인
         if "file" in item:
@@ -273,11 +279,12 @@ def fetch_drive_files(access_token: str, drive_id: str, folder_id: Optional[str]
                     modified_by = version.get("lastModifiedBy", {}).get("user", {})
                     if modified_by:
                         email = modified_by.get("email") or modified_by.get("displayName", "알 수 없음")
-                        authors.add(email)
+                        user_id = user_info.get(email, 0)
+                        authors.add(user_id)
 
         # 폴더면 재귀적으로 내부 파일 가져오기
         if "folder" in item:
-            folder_items = fetch_drive_files(access_token, drive_id, item["id"])
+            folder_items = fetch_drive_files(access_token, drive_id, user_info, item["id"])
             entries.extend(folder_items)
         else:
             entry = DocsEntry(

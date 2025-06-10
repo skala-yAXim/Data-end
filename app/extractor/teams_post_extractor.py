@@ -2,6 +2,7 @@ from typing import List, Union
 from app.common.utils import clean_html
 from app.schemas.teams_post_activity import PostEntry, ReplyEntry
 from app.vectordb.schema import BaseRecord, TeamsPostMetadata
+from app.common.cache import app_cache
 
 def create_record_from_post_entry(team_post: PostEntry) -> List[BaseRecord[TeamsPostMetadata]]:
     docs: List[BaseRecord[TeamsPostMetadata]] = []
@@ -11,7 +12,7 @@ def create_record_from_post_entry(team_post: PostEntry) -> List[BaseRecord[Teams
     record = BaseRecord[TeamsPostMetadata](
         text=parsed.text,
         metadata=TeamsPostMetadata(
-            user_id=parsed.metadata.user_id,
+            author=parsed.metadata.author,
             date=parsed.metadata.date
         )
     )
@@ -26,7 +27,7 @@ def create_record_from_post_entry(team_post: PostEntry) -> List[BaseRecord[Teams
         reply_record = BaseRecord[TeamsPostMetadata](
             text=parsed_reply.text,
             metadata=TeamsPostMetadata(
-                user_id=parsed_reply.metadata.user_id,
+                author=parsed_reply.metadata.author,
                 date=parsed_reply.metadata.date
             )
         )
@@ -60,7 +61,7 @@ def parse_post_data(
     combined_text = "\n".join(text_parts).strip()
 
     metadata = TeamsPostMetadata(
-        user_id=data.author,
+        author=data.author,
         date=data.date
     )
 
