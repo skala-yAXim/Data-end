@@ -12,3 +12,8 @@ def create_collection(client: QdrantClient, collection_name: str):
       collection_name=collection_name,
       vectors_config=VectorParams(size=384, distance=Distance.COSINE),
   )
+
+def flush_collection(collection_name: str, host: str = "localhost", port: int = 6333):
+    client = get_qdrant_client()
+    response = client._client.post(f"/collections/{collection_name}/flush")
+    return response.json()
