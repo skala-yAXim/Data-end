@@ -45,7 +45,7 @@ class GitIssueMetadata(BaseMetadata):
 class EmailMetadata(BaseMetadata):
   author: str
   sender: str
-  receiver: str
+  receivers: List[str]
   subject: str
   conversation_id: str
   date: datetime

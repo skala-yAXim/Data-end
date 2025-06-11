@@ -333,10 +333,14 @@ def fetch_user_inbox_emails(token: str, user_email: str) -> List[EmailEntry]:
     if response.status_code == 200:
         messages = response.json().get("value", [])
         results: List[EmailEntry] = []
+        receivers: List[str] = []
 
         for msg in messages:
             sender = msg.get("from", {}).get("emailAddress", {}).get("address", "")
-            receiver = msg.get("toRecipients", [{}])[0].get("emailAddress", {}).get("address", "")
+            receivers = [
+                recipient.get("emailAddress", {}).get("address", "")
+                for recipient in msg.get("toRecipients", [])
+            ]
             subject = msg.get("subject", "")
             content = msg.get("body", {}).get("content", "")
             date = convert_utc_to_kst(msg.get("receivedDateTime", ""))
@@ -348,7 +352,7 @@ def fetch_user_inbox_emails(token: str, user_email: str) -> List[EmailEntry]:
             email_entry = EmailEntry(
                 author=user_email,
                 sender=sender,
-                receiver=receiver,
+                receivers=receivers,
                 subject=subject,
                 content=content,
                 date=date,
@@ -376,10 +380,14 @@ def fetch_user_sent_emails(token: str, user_email: str) -> List[EmailEntry]:
     if response.status_code == 200:
         messages = response.json().get("value", [])
         results: List[EmailEntry] = []
+        receivers: List[str] = []
 
         for msg in messages:
             sender = msg.get("from", {}).get("emailAddress", {}).get("address", "")
-            receiver = msg.get("toRecipients", [{}])[0].get("emailAddress", {}).get("address", "")
+            receivers = [
+                recipient.get("emailAddress", {}).get("address", "")
+                for recipient in msg.get("toRecipients", [])
+            ]
             subject = msg.get("subject", "")
             content = msg.get("body", {}).get("content", "")
             date = convert_utc_to_kst(msg.get("receivedDateTime", ""))
@@ -391,7 +399,7 @@ def fetch_user_sent_emails(token: str, user_email: str) -> List[EmailEntry]:
             email_entry = EmailEntry(
                 author=user_email,
                 sender=sender,
-                receiver=receiver,
+                receivers=receivers,
                 subject=subject,
                 content=content,
                 date=date,
