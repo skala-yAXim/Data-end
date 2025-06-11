@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime
 
 class CommitEntry(BaseModel):
@@ -27,7 +27,14 @@ class IssueEntry(BaseModel):
     author: Optional[str]
 
 class ReadmeInfo(BaseModel):
-    name: str
+    repo_name: str
     content: str
     html_url: str
     download_url: Optional[str]
+
+class GitActivity(BaseModel):
+    repo: str
+    commits: Optional[List[CommitEntry]] = None
+    pull_requests: Optional[List[PullRequestEntry]] = None
+    issues: Optional[List[IssueEntry]] = None
+    readme: Optional[ReadmeInfo] = None

@@ -1,5 +1,6 @@
 from app.schemas.docs_activity import DocsEntry
 from app.schemas.email_activity import EmailEntry
+from app.schemas.github_activity import GitActivity, ReadmeInfo
 from app.schemas.teams_post_activity import PostEntry
 from app.pipeline.docs_pipeline import save_docs_data
 from app.pipeline.email_pipeline import save_all_email_data
@@ -15,7 +16,7 @@ def read_root():
     return {"message": "Hello from FastAPI"}
 
 
-@router.get("/github/data")
+@router.get("/github/data", response_model=List[GitActivity])
 async def get_github_data():
     """
     설치된 모든 GitHub repository에 대해 커밋, PR, 이슈 데이터를 저장하여 반환합니다.
