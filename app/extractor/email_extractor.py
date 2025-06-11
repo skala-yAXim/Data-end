@@ -11,7 +11,7 @@ def extract_email_content(email: EmailEntry) -> BaseRecord[EmailMetadata]:
         metadata=EmailMetadata(
             author=email.author,
             sender=email.sender,
-            receiver=email.receiver,
+            receivers=email.receivers,
             subject=email.subject,
             date=email.date,
             conversation_id=email.conversation_id
