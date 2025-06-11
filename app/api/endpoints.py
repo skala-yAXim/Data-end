@@ -8,6 +8,8 @@ from app.pipeline.teams_post_pipeline import save_teams_posts_data
 from fastapi import APIRouter, Request
 from typing import List
 
+from app.vectordb.client import flush_all_collections
+
 router = APIRouter()
 
 @router.get("/")
@@ -54,3 +56,7 @@ def list_collections(request: Request):
     """
     qdrant = request.app.state.qdrant_client
     return qdrant.get_collections()
+
+@router.get("/flush")
+def flush_collections(request: Request):
+    return flush_all_collections()
