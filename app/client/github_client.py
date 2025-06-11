@@ -243,7 +243,7 @@ async def fetch_readme(owner: str, repo: str, access_token: str) -> Optional[Rea
             data = res.json()
             decoded = b64decode(data["content"]).decode("utf-8")
             return ReadmeInfo(
-                name=data["name"],
+                repo_name=f"{owner}/{repo}",
                 content=decoded,
                 html_url=data["html_url"],
                 download_url=data.get("download_url")
