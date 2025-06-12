@@ -6,12 +6,13 @@ class AppCache:
         self.git_id = {}
         self.user_email = {}
         self.user_name = {}
+        self.user_infos = []
         self.teams = []
 
     def load(self, db):
         from app.rdb.repository import find_all_git_info, find_all_teams, find_all_users
         git_infos = find_all_git_info(db)
-        user_infos = find_all_users(db)
+        self.user_infos = find_all_users(db)
 
         self.git_email = {
             info.git_email: info.user_id
@@ -27,13 +28,13 @@ class AppCache:
 
         self.user_email = {
             info.email: info.id
-            for info in user_infos
+            for info in self.user_infos
             if info.email
         }
 
         self.user_name = {
             info.name: info.id
-            for info in user_infos
+            for info in self.user_infos
             if info.name
         }
 
