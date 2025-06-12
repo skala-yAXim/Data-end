@@ -11,7 +11,7 @@ def create_record_from_post_entry(team_post: PostEntry) -> List[BaseRecord[Teams
     record = BaseRecord[TeamsPostMetadata](
         text=parsed.text,
         metadata=TeamsPostMetadata(
-            user_id=parsed.metadata.user_id,
+            author=parsed.metadata.author,
             date=parsed.metadata.date
         )
     )
@@ -26,7 +26,7 @@ def create_record_from_post_entry(team_post: PostEntry) -> List[BaseRecord[Teams
         reply_record = BaseRecord[TeamsPostMetadata](
             text=parsed_reply.text,
             metadata=TeamsPostMetadata(
-                user_id=parsed_reply.metadata.user_id,
+                author=parsed_reply.metadata.author,
                 date=parsed_reply.metadata.date
             )
         )
@@ -60,7 +60,7 @@ def parse_post_data(
     combined_text = "\n".join(text_parts).strip()
 
     metadata = TeamsPostMetadata(
-        user_id=data.author,
+        author=data.author,
         date=data.date
     )
 
