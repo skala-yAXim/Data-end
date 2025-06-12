@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class DocsEntry(BaseModel):
   file_id: str
   filename: str
-  author: List[int]
+  author: List[str]
   last_modified: datetime
   type: str
   size: int

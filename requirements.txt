@@ -23,7 +23,3 @@ httpx==0.27.0
 pandas>=2.0.0
 openpyxl>=3.1.2  # Excel 파일 처리
 python-docx==1.1.2
-
-# PostgreSQL 연동용
-SQLAlchemy==2.0.30
-psycopg2==2.9.9
