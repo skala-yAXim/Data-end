@@ -1,12 +1,10 @@
 import os
-from sqlalchemy.orm import Session
 from typing import List
 from app.client.ms_graph_client import download_file_from_graph, fetch_all_sites, fetch_drive_files, get_access_token, get_drive_id
 from app.common.config import DOCS_COLLECTION_NAME, MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_TENANT_ID
 from app.extractor.document_extractor import create_record_from_entry, extract_file_content
 from app.schemas.docs_activity import DocsEntry
 from app.vectordb.uploader import upload_data_to_db
-from app.common.cache import app_cache
 
 async def save_docs_data():
     # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정
@@ -14,7 +12,6 @@ async def save_docs_data():
     
     all_docs: List[DocsEntry] = []
     sites = fetch_all_sites(token)
-    user_info = app_cache.user_email
     
     for site in sites:
         site_id = site.get("id")
@@ -36,7 +33,7 @@ async def save_docs_data():
             if not drive_id:
                 continue
 
-            docs = fetch_drive_files(token, drive_id, user_info)
+            docs = fetch_drive_files(token, drive_id)
             all_docs.extend(docs)
 
         except Exception as e:

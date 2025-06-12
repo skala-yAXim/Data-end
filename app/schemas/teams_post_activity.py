@@ -5,13 +5,13 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 class ReplyEntry(BaseModel):
-  author: int
+  author: str
   content: str
   date: datetime
   attachments: Optional[List[str]]
 
 class PostEntry(BaseModel):
-  author: int
+  author: str
   subject: str
   summary: str
   content: str
