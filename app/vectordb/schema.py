@@ -45,10 +45,15 @@ class GitIssueMetadata(BaseMetadata):
 class EmailMetadata(BaseMetadata):
   author: int
   sender: str
-  receiver: str
+  receivers: List[str]
   subject: str
   conversation_id: str
   date: datetime
+
+class GitReadMeMetadata(BaseMetadata):
+  repo_name: str
+  html_url: str
+  download_url: str
   
 M = TypeVar("M", bound=BaseMetadata)
 

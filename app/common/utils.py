@@ -5,6 +5,7 @@ from docx import Document
 from openpyxl import load_workbook
 from typing import List
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from datetime import datetime, timezone, timedelta
 
 def clean_html(raw_html):
     return re.sub(r'<[^>]+>', '', raw_html)
@@ -93,3 +94,34 @@ def extract_from_txt(file_path: str) -> str:
 def split_into_chunks(text: str, chunk_size: int = 500, chunk_overlap: int = 50) -> List[str]:
     splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     return splitter.split_text(text)
+
+def convert_utc_to_kst(utc_datetime_str: str) -> datetime:
+    """
+    UTC ISO 8601 문자열(밀리초 포함 가능)을 받아 한국 시간(KST) datetime 객체로 반환.
+    빈 문자열이나 파싱 실패 시 현재 KST 시간을 반환.
+    """
+    try:
+        if not utc_datetime_str:
+            raise ValueError("빈 문자열")
+        
+        # 밀리초(.f)를 처리할 수 있도록 포맷을 수정하고, 끝의 Z를 제거
+        if utc_datetime_str.endswith('Z'):
+            utc_datetime_str = utc_datetime_str[:-1]
+
+        # 마이크로초가 없는 경우와 있는 경우 모두 처리
+        try:
+            # 밀리초가 있는 경우
+            utc_time = datetime.strptime(utc_datetime_str, "%Y-%m-%dT%H:%M:%S.%f")
+        except ValueError:
+            # 밀리초가 없는 경우
+            utc_time = datetime.strptime(utc_datetime_str, "%Y-%m-%dT%H:%M:%S")
+
+        # 타임존 정보(UTC)를 설정
+        utc_time = utc_time.replace(tzinfo=timezone.utc)
+
+    except Exception:
+        # 파싱 실패 시 (예: 포맷이 아예 다른 경우) 현재 시간으로 대체
+        utc_time = datetime.now(timezone.utc)
+
+    kst = timezone(timedelta(hours=9))
+    return utc_time.astimezone(kst)

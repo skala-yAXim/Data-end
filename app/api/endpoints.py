@@ -1,5 +1,6 @@
 from app.schemas.docs_activity import DocsEntry
 from app.schemas.email_activity import EmailEntry
+from app.schemas.github_activity import GitActivity, ReadmeInfo
 from app.schemas.teams_post_activity import PostEntry
 from app.pipeline.docs_pipeline import save_docs_data
 from app.pipeline.email_pipeline import save_all_email_data
@@ -12,6 +13,8 @@ from fastapi import APIRouter, Request, Depends, Path
 from sqlalchemy.orm import Session
 from typing import List
 
+from app.vectordb.client import flush_all_collections
+
 router = APIRouter()
 
 @router.get("/")
@@ -19,7 +22,7 @@ def read_root():
     return {"message": "Hello from FastAPI"}
 
 
-@router.get("/github/data")
+@router.get("/github/data", response_model=List[GitActivity])
 async def get_github_data():
     """
     설치된 모든 GitHub repository에 대해 커밋, PR, 이슈 데이터를 저장하여 반환합니다.
@@ -98,3 +101,7 @@ def get_vector_user_activity(
     # TODO: 일요일 저녁에 배치 돌린다는 가정 하에, 7일 전으로 설정되게 할 것
     # return save_user_activities_to_rdb("2025-05-30", db)
     return save_user_activities_to_rdb(target_date, db)
+
+@router.get("/flush")
+def flush_collections(request: Request):
+    return flush_all_collections()

@@ -11,7 +11,7 @@ def extract_email_content(email: EmailEntry, user_info: dict[str, int]) -> BaseR
         metadata=EmailMetadata(
             author=user_info.get(email.author, 0),
             sender=email.sender,
-            receiver=email.receiver,
+            receivers=email.receivers,
             subject=email.subject,
             date=email.date,
             conversation_id=email.conversation_id

@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
 from app.client.github_client import create_jwt_token, fetch_all_branch_commits, fetch_issues, fetch_pull_requests, fetch_readme, fetch_repositories, get_installation_access_token, load_private_key
-from app.extractor.github_activity_extractor import extract_record_from_commit_entry, extract_record_from_issue_entry, extract_record_from_pull_request_entry
-from app.common.config import GIT_COLLECTION_NAME, GITHUB_APP_ID, GITHUB_PRIVATE_KEY_PATH
+from app.extractor.github_activity_extractor import extract_record_from_commit_entry, extract_record_from_issue_entry, extract_record_from_pull_request_entry, extract_record_from_readme
+from app.common.config import GIT_COLLECTION_NAME, GITHUB_APP_ID, GITHUB_PRIVATE_KEY_PATH, README_COLLECTION_NAME
+from app.schemas.github_activity import GitActivity
 from app.vectordb.uploader import upload_data_to_db
 from app.common.cache import app_cache
 
@@ -32,13 +33,20 @@ async def save_all_data_for_repo(owner: str, repo: str, access_token: str):
     
     readme = await fetch_readme(owner, repo, access_token)
     
-    return {
-        "repo": f"{owner}/{repo}",
-        "commits": commits,
-        "pull_requests": prs,
-        "issues": issues,
-        "readme": readme
-    }
+    readme_record = extract_record_from_readme(readme)
+    if readme_record:
+        upload_data_to_db(collection_name=README_COLLECTION_NAME, records=[readme_record])
+    else:
+        print("README 데이터 없음. 업로드 생략.")
+    
+    return GitActivity(
+        repo = f"{owner}/{repo}",
+        commits = commits,
+        pull_requests = prs,
+        issues =  issues,
+        readme = readme
+    )
+
 
 async def save_github_data():
     # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정

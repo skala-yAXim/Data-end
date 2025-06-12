@@ -5,7 +5,7 @@ from datetime import datetime
 class EmailEntry(BaseModel):
     author: str
     sender: str
-    receiver: str
+    receivers: List[str]
     subject: str
     content: str
     date: datetime

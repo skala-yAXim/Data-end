@@ -7,6 +7,7 @@ import httpx
 import jwt
 import requests
 
+from app.common.utils import convert_utc_to_kst
 from app.schemas.github_activity import CommitEntry, IssueEntry, PullRequestEntry, ReadmeInfo
 from app.common.cache import app_cache
 
@@ -142,7 +143,7 @@ async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, git
                         repo=f"{owner}/{repo}",
                         sha=sha,
                         message=commit.get("message"),
-                        date=commit["author"]["date"],
+                        date=convert_utc_to_kst(commit["author"]["date"]),
                         author=author_name
                     ))
 
@@ -184,7 +185,7 @@ async def fetch_pull_requests(owner: str, repo: str, access_token: str, git_emai
                     number=pr["number"],
                     title=pr.get("title"),
                     content=pr.get("body"),
-                    created_at=pr["created_at"],
+                    created_at=convert_utc_to_kst(pr["created_at"]),
                     state=pr["state"],
                     author=author_email or username  # fallback to username
                 ))
@@ -225,7 +226,7 @@ async def fetch_issues(owner: str, repo: str, access_token: str, git_email: dict
                     repo=f"{owner}/{repo}",
                     number=issue["number"],
                     title=issue.get("title"),
-                    created_at=issue["created_at"],
+                    created_at=convert_utc_to_kst(issue["created_at"]),
                     state=issue["state"],
                     author=author_email or username
                 ))
@@ -253,7 +254,7 @@ async def fetch_readme(owner: str, repo: str, access_token: str) -> Optional[Rea
             data = res.json()
             decoded = b64decode(data["content"]).decode("utf-8")
             return ReadmeInfo(
-                name=data["name"],
+                repo_name=f"{owner}/{repo}",
                 content=decoded,
                 html_url=data["html_url"],
                 download_url=data.get("download_url")
