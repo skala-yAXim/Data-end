@@ -2,7 +2,6 @@ from typing import List, Union
 from app.common.utils import clean_html
 from app.schemas.teams_post_activity import PostEntry, ReplyEntry
 from app.vectordb.schema import BaseRecord, TeamsPostMetadata
-from app.common.cache import app_cache
 
 def create_record_from_post_entry(team_post: PostEntry) -> List[BaseRecord[TeamsPostMetadata]]:
     docs: List[BaseRecord[TeamsPostMetadata]] = []
