@@ -7,7 +7,7 @@ class CommitEntry(BaseModel):
     sha: str
     message: Optional[str]
     date: datetime
-    author: Optional[str]
+    author: Optional[int]
 
 class PullRequestEntry(BaseModel):
     repo: str
@@ -16,7 +16,7 @@ class PullRequestEntry(BaseModel):
     content: Optional[str]
     created_at: datetime
     state: str
-    author: Optional[str]
+    author: Optional[int]
 
 class IssueEntry(BaseModel):
     repo: str
@@ -24,7 +24,7 @@ class IssueEntry(BaseModel):
     title: Optional[str]
     created_at: datetime
     state: str
-    author: Optional[str]
+    author: Optional[int]
 
 class ReadmeInfo(BaseModel):
     name: str

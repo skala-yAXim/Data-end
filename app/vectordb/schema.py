@@ -8,27 +8,27 @@ class BaseMetadata(BaseModel):
     pass
 
 class TeamsPostMetadata(BaseMetadata):
-  user_id: str
+  author: int
   date: datetime
 
 class DocumentMetadata(BaseMetadata):
   file_id: str
   filename: str
-  author: List[str]
+  author: List[int]
   last_modified: datetime
   type: str
   size: int
   chunk_id: int
   
 class GitCommitMetadata(BaseMetadata):
-  author: str
+  author: int
   date: datetime
   type: str
   repo_name: str
   sha: str
 
 class GitPRMetadata(BaseMetadata):
-  author: str
+  author: int
   date: datetime
   type: str
   repo_name: str
@@ -36,14 +36,14 @@ class GitPRMetadata(BaseMetadata):
   state: str
   
 class GitIssueMetadata(BaseMetadata):
-  author: str
+  author: int
   date: datetime
   type: str
   repo_name: str
   number: int
 
 class EmailMetadata(BaseMetadata):
-  author: str
+  author: int
   sender: str
   receiver: str
   subject: str

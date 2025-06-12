@@ -61,3 +61,5 @@ coverage.xml
 # OS-specific
 .DS_Store
 Thumbs.db
+
+data.py
