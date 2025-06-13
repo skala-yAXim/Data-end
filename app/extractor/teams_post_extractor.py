@@ -3,33 +3,20 @@ from app.common.utils import clean_html
 from app.schemas.teams_post_activity import PostEntry, ReplyEntry
 from app.vectordb.schema import BaseRecord, TeamsPostMetadata
 
-def create_record_from_post_entry(team_post: PostEntry) -> List[BaseRecord[TeamsPostMetadata]]:
+def create_records_from_post_entry(team_post: PostEntry) -> List[BaseRecord[TeamsPostMetadata]]:
     docs: List[BaseRecord[TeamsPostMetadata]] = []
 
-    parsed = parse_post_data(team_post)
+    post_record = parse_post_data(team_post)
 
-    record = BaseRecord[TeamsPostMetadata](
-        text=parsed.text,
-        metadata=TeamsPostMetadata(
-            author=parsed.metadata.author,
-            date=parsed.metadata.date
-        )
-    )
-    docs.append(record)
+    docs.append(post_record)
 
     for reply in team_post.replies or []:
-        parsed_reply = parse_post_data(
+        reply_record = parse_post_data(
             data=reply,
             is_reply=True,
             post_content=team_post.content
         )
-        reply_record = BaseRecord[TeamsPostMetadata](
-            text=parsed_reply.text,
-            metadata=TeamsPostMetadata(
-                author=parsed_reply.metadata.author,
-                date=parsed_reply.metadata.date
-            )
-        )
+
         docs.append(reply_record)
 
     return docs
@@ -61,6 +48,7 @@ def parse_post_data(
 
     metadata = TeamsPostMetadata(
         author=data.author,
+        type="post" if not is_reply else "reply",
         date=data.date
     )
 

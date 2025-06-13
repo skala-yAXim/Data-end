@@ -9,6 +9,7 @@ class BaseMetadata(BaseModel):
 
 class TeamsPostMetadata(BaseMetadata):
   author: int
+  type: str
   date: datetime
 
 class DocumentMetadata(BaseMetadata):
