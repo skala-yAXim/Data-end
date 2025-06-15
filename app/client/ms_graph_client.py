@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import os
 import re
+from sqlalchemy.orm import Session
 from typing import List, Optional
 from msal import ConfidentialClientApplication
 import requests
@@ -9,7 +10,7 @@ from app.common.utils import convert_utc_to_kst, extract_text_from_json
 from app.schemas.docs_activity import DocsEntry
 from app.schemas.email_activity import EmailEntry
 from app.schemas.teams_post_activity import PostEntry, ReplyEntry
-from app.common.cache import app_cache
+from app.common.utils import get_user_emails_and_names
 
 KST = timezone(timedelta(hours=9))
 
@@ -91,7 +92,7 @@ def fetch_channels(token: str, team_id: str):
     else:
         raise Exception(f"채널 조회 실패: {response.status_code} {response.text}")
 
-def fetch_replies_for_message(token: str, team_id: str, channel_id: str, message_id: str) -> List[ReplyEntry]:
+def fetch_replies_for_message(token: str, team_id: str, channel_id: str, message_id: str, user_email: dict[str, int]) -> List[ReplyEntry]:
     endpoint = f"https://graph.microsoft.com/v1.0/teams/{team_id}/channels/{channel_id}/messages/{message_id}/replies"
     headers = {
         "Authorization": f"Bearer {token}",
@@ -106,7 +107,7 @@ def fetch_replies_for_message(token: str, team_id: str, channel_id: str, message
         for reply in reply_data:
             reply_author_id = reply.get("from", {}).get("user", {}).get("id", "알 수 없음")
             reply_author = get_user_email(reply_author_id, token)
-            author = app_cache.user_email.get(reply_author, 0)
+            author = user_email.get(reply_author, 0)
             reply_content = reply.get("body", {}).get("content", "")
             reply_date = convert_utc_to_kst(reply.get("createdDateTime", ""))
             
@@ -128,7 +129,7 @@ def fetch_replies_for_message(token: str, team_id: str, channel_id: str, message
 
     return replies
 
-def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostEntry]:
+def fetch_channel_posts(token: str, team_id: str, channel_id: str, db: Session) -> List[PostEntry]:
     endpoint = f"https://graph.microsoft.com/v1.0/teams/{team_id}/channels/{channel_id}/messages"
     headers = {
         "Authorization": f"Bearer {token}",
@@ -138,8 +139,7 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
     posts: List[PostEntry] = []
     url = endpoint
 
-    user_email = app_cache.user_email
-    user_name = app_cache.user_name
+    user_email, user_name = get_user_emails_and_names(db)
 
     while url:
         response = requests.get(url, headers=headers)
@@ -191,7 +191,7 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str) -> List[PostE
                     if name:
                         attachments.append(name)
 
-            replies: List[ReplyEntry] = fetch_replies_for_message(token, team_id, channel_id, item["id"])
+            replies: List[ReplyEntry] = fetch_replies_for_message(token, team_id, channel_id, item["id"], user_email)
 
             if author == "Jira Cloud" and application_content[0]:
                 match = re.match(r"([^\s]+)\s", application_content[0])

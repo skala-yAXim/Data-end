@@ -6,10 +6,11 @@ from cryptography.hazmat.primitives import serialization
 import httpx
 import jwt
 import requests
+from sqlalchemy.orm import Session
 
 from app.common.utils import convert_utc_to_kst
 from app.schemas.github_activity import CommitEntry, IssueEntry, PullRequestEntry, ReadmeInfo
-from app.common.cache import app_cache
+from app.rdb.repository import find_all_teams
 
 BASE_URL = "https://api.github.com"
 
@@ -39,7 +40,7 @@ def create_jwt_token(app_id: str, private_key) -> str:
     
     return token
 
-def get_installation_access_token(jwt_token: str) -> list[str]:
+def get_installation_access_token(jwt_token: str, db: Session) -> list[str]:
     headers = {
         "Authorization": f"Bearer {jwt_token}",
         "Accept": "application/vnd.github+json"
@@ -53,7 +54,7 @@ def get_installation_access_token(jwt_token: str) -> list[str]:
     if not installations:
         raise Exception("No installations found for this GitHub App.")
 
-    teams = app_cache.teams
+    teams = find_all_teams(db)
     installation_ids = [team.installation_id for team in teams if team.installation_id is not None]
     access_tokens = []
 
@@ -108,7 +109,7 @@ async def fetch_user_email(username: str, access_token: str, client: httpx.Async
     
     return None
 
-async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, git_email: dict[str, int], git_id: dict[str, int], limit_per_branch: int = 5) -> List[CommitEntry]:
+async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, git_email: dict[str, int], limit_per_branch: int = 5) -> List[CommitEntry]:
     branches_url = f"{BASE_URL}/repos/{owner}/{repo}/branches"
     commits = []
     seen_shas = set()  # 중복 방지용 SHA 저장소
@@ -157,7 +158,7 @@ async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, git
     return commits
 
 
-async def fetch_pull_requests(owner: str, repo: str, access_token: str, git_email: dict[str, int], git_id:dict[str, int]) -> List[PullRequestEntry]:
+async def fetch_pull_requests(owner: str, repo: str, access_token: str, git_email: dict[str, int], git_id: dict[str, int]) -> List[PullRequestEntry]:
     url = f"{BASE_URL}/repos/{owner}/{repo}/pulls?state=all"
 
     try:

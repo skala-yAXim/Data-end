@@ -4,8 +4,10 @@ import re
 from docx import Document
 from openpyxl import load_workbook
 from typing import List
+from sqlalchemy.orm import Session
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from datetime import datetime, timezone, timedelta
+from app.rdb.repository import find_all_users, find_all_git_info
 
 def clean_html(raw_html):
     return re.sub(r'<[^>]+>', '', raw_html)
@@ -125,3 +127,36 @@ def convert_utc_to_kst(utc_datetime_str: str) -> datetime:
 
     kst = timezone(timedelta(hours=9))
     return utc_time.astimezone(kst)
+
+def get_user_emails(db: Session) -> dict:
+    users = find_all_users(db)
+    return {
+        info.email: info.id
+        for info in users
+        if info.email
+    }
+
+def get_user_emails_and_names(db: Session):
+    users = find_all_users(db)
+    return {
+        info.email: info.id
+        for info in users
+        if info.email
+    }, {
+        info.name: info.id
+        for info in users
+        if info.name
+    }
+
+def get_git_emails_and_ids(db: Session):
+    git_info = find_all_git_info(db)
+
+    return  {
+        info.git_email: info.user_id
+            for info in git_info
+            if info.git_email
+    }, {
+        info.git_id: info.user_id
+        for info in git_info
+        if info.git_id
+    }

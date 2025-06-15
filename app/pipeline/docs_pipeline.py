@@ -6,15 +6,16 @@ from app.common.config import DOCS_COLLECTION_NAME, MICROSOFT_CLIENT_ID, MICROSO
 from app.extractor.document_extractor import create_record_from_entry, extract_file_content
 from app.schemas.docs_activity import DocsEntry
 from app.vectordb.uploader import upload_data_to_db
-from app.common.cache import app_cache
+from app.common.utils import get_user_emails
 
-async def save_docs_data():
+async def save_docs_data(db: Session):
     # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정
     token = get_access_token(client_id=MICROSOFT_CLIENT_ID, client_secret=MICROSOFT_CLIENT_SECRET, tenant_id=MICROSOFT_TENANT_ID)
     
     all_docs: List[DocsEntry] = []
     sites = fetch_all_sites(token)
-    user_info = app_cache.user_email
+
+    user_info = get_user_emails(db)
     
     for site in sites:
         site_id = site.get("id")
