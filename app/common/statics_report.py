@@ -3,14 +3,13 @@ from datetime import datetime, timedelta, date
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue, DatetimeRange
 from app.rdb.schema import DailyUserActivity, User, Weekday
-from app.rdb.repository import save_daily_user_activity, flush_daily_user_activity_if_exists
+from app.rdb.repository import save_daily_user_activity, flush_daily_user_activity_if_exists, find_all_users
 from app.common.config import TEAMS_COLLECTION_NAME, GIT_COLLECTION_NAME, EMAIL_COLLECTION_NAME, DOCS_COLLECTION_NAME
 from app.vectordb.client import get_qdrant_client
-from app.common.cache import app_cache
 
 def save_user_activities_to_rdb(target_date: str, db: Session):
     date = datetime.strptime(target_date, "%Y-%m-%d").date()
-    data = load_user_activities_from_vector_db(date)
+    data = load_user_activities_from_vector_db(date, db)
 
     flush_daily_user_activity_if_exists(db)
 
@@ -18,6 +17,8 @@ def save_user_activities_to_rdb(target_date: str, db: Session):
         for day in week:
             user_id = day.get("id")
             statics = day.get("statics")
+
+            teams = statics.get("teams")
             email = statics.get("email")
             docs = statics.get("docs")
             git = statics.get("git")
@@ -26,12 +27,13 @@ def save_user_activities_to_rdb(target_date: str, db: Session):
                 user_id=user_id,
                 report_date=date + timedelta(days=day.get("day")),
                 day=Weekday(day.get("day")),        # enum 사용
-                teams_post=statics.get("teams").get("post"),
+                teams_post=teams.get("post"),
+                teams_reply=teams.get("reply"),
                 email_send=email.get("sender"),
                 email_receive=email.get("receiver"),
                 docs_docx=docs.get("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
                 docs_xlsx=docs.get("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-                docs_txt=0,
+                docs_pptx=docs.get("application/vnd.openxmlformats-officedocument.presentationml.presentation"),
                 docs_etc=docs.get("else"),
                 git_pull_request=git.get("pull_request"),
                 git_commit=git.get("commit"),
@@ -42,7 +44,7 @@ def save_user_activities_to_rdb(target_date: str, db: Session):
 
     return data
 
-def load_user_activities_from_vector_db(target_date: date) -> list:
+def load_user_activities_from_vector_db(target_date: date, db: Session) -> list:
     statics = []
 
     for i in range(7):
@@ -56,7 +58,7 @@ def load_user_activities_from_vector_db(target_date: date) -> list:
 
         client = get_qdrant_client()
 
-        users = app_cache.user_infos
+        users = find_all_users(db)
 
         for user in users:
             array = {}
@@ -77,32 +79,38 @@ def load_user_activities_from_vector_db(target_date: date) -> list:
     return statics
 
 
-
-
-
 def teams_report(client: QdrantClient, user: User, start_str: str, end_str: str) -> dict:
+    metadata_combinations = ["post", "reply"]
 
-    count = client.count(
-                collection_name=TEAMS_COLLECTION_NAME,
-                count_filter=Filter(
-                    must=[
-                        FieldCondition(
-                            key="author",
-                            match=MatchValue(value=user.id)
-                        ),
-                        FieldCondition(
-                            key="date",
-                            range=DatetimeRange(
-                                gte=start_str,
-                                lte=end_str
+    result = {}
+
+    for metadata in metadata_combinations:
+        count = client.count(
+                    collection_name=TEAMS_COLLECTION_NAME,
+                    count_filter=Filter(
+                        must=[
+                            FieldCondition(
+                                key="author",
+                                match=MatchValue(value=user.id)
+                            ),
+                            FieldCondition(
+                                key="date",
+                                range=DatetimeRange(
+                                    gte=start_str,
+                                    lte=end_str
+                                )
+                            ),
+                            FieldCondition(
+                                key="type",
+                                match=MatchValue(value=metadata)
                             )
-                        )
-                    ]
-                ),
-                exact=True
-            )
+                        ]
+                    ),
+                    exact=True
+                )
+        result[metadata] = count.count
     
-    return {"post": count.count}
+    return result
 
 
 def email_report(client: QdrantClient, user: User, start_str: str, end_str: str) -> dict:
@@ -142,7 +150,8 @@ def email_report(client: QdrantClient, user: User, start_str: str, end_str: str)
 def docs_report(client: QdrantClient, user: User, start_str: str, end_str: str) -> dict:
     metadata_combinations = [
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
     ]
 
     # TODO: VectorDB에 적재되는 type이 수정되면 바뀌어야 함
