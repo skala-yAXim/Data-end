@@ -56,6 +56,8 @@ def get_installation_access_token(jwt_token: str) -> list[str]:
     teams = app_cache.teams
     installation_ids = [team.installation_id for team in teams if team.installation_id is not None]
     access_tokens = []
+    
+    installation_ids = ["71420197"]
 
     for installation_id in installation_ids:
         access_token_url = f"https://api.github.com/app/installations/{installation_id}/access_tokens"
@@ -108,44 +110,70 @@ async def fetch_user_email(username: str, access_token: str, client: httpx.Async
     
     return None
 
-async def fetch_all_branch_commits(owner: str, repo: str, access_token: str, git_email: dict[str, int], git_id: dict[str, int], limit_per_branch: int = 5) -> List[CommitEntry]:
+async def fetch_all_branch_commits(
+    owner: str,
+    repo: str,
+    access_token: str,
+    git_email: dict[str, int],
+    git_id: dict[str, int],
+    limit_per_branch: int = None  # None이면 제한 없이 전체 가져오기
+) -> List[CommitEntry]:
     branches_url = f"{BASE_URL}/repos/{owner}/{repo}/branches"
     commits = []
-    seen_shas = set()  # 중복 방지용 SHA 저장소
+    seen_shas = set()
 
     async with httpx.AsyncClient() as client:
         try:
-            # 1. 브랜치 목록 조회
             res_branches = await client.get(branches_url, headers=get_headers(access_token))
             res_branches.raise_for_status()
             branches = res_branches.json()
 
-            # 2. 각 브랜치별 커밋 조회
             for branch in branches:
                 branch_name = branch["name"]
-                commits_url = f"{BASE_URL}/repos/{owner}/{repo}/commits"
-                params = {"sha": branch_name, "per_page": limit_per_branch}
-                res_commits = await client.get(commits_url, headers=get_headers(access_token), params=params)
-                res_commits.raise_for_status()
+                page = 1
+                fetched = 0
 
-                for item in res_commits.json():
-                    sha = item["sha"]
-                    if sha in seen_shas:
-                        continue  # 중복된 커밋은 무시
+                while True:
+                    commits_url = f"{BASE_URL}/repos/{owner}/{repo}/commits"
+                    params = {
+                        "sha": branch_name,
+                        "per_page": 100,
+                        "page": page
+                    }
 
-                    seen_shas.add(sha)
+                    res_commits = await client.get(commits_url, headers=get_headers(access_token), params=params)
+                    res_commits.raise_for_status()
+                    commit_items = res_commits.json()
 
-                    commit = item["commit"]
-                    author_name = commit["author"]["email"] if commit.get("author") else None
-                    author_name = git_email.get(author_name, 0)
+                    if not commit_items:
+                        break  # 더 이상 커밋 없음
 
-                    commits.append(CommitEntry(
-                        repo=f"{owner}/{repo}",
-                        sha=sha,
-                        message=commit.get("message"),
-                        date=convert_utc_to_kst(commit["author"]["date"]),
-                        author=author_name
-                    ))
+                    for item in commit_items:
+                        sha = item["sha"]
+                        if sha in seen_shas:
+                            continue
+
+                        seen_shas.add(sha)
+
+                        commit = item["commit"]
+                        author_email = commit["author"]["email"] if commit.get("author") else None
+                        author_id = git_email.get(author_email, 0)
+
+                        commits.append(CommitEntry(
+                            repo=f"{owner}/{repo}",
+                            sha=sha,
+                            message=commit.get("message"),
+                            date=convert_utc_to_kst(commit["author"]["date"]),
+                            author=author_id
+                        ))
+
+                        fetched += 1
+                        if limit_per_branch and fetched >= limit_per_branch:
+                            break
+
+                    if limit_per_branch and fetched >= limit_per_branch:
+                        break
+                    page += 1
 
         except httpx.HTTPStatusError as e:
             print(f"HTTP error occurred: {e.response.status_code} - {e.response.text}")
