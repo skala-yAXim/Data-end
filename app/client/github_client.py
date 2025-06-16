@@ -56,7 +56,7 @@ def get_installation_access_token(jwt_token: str) -> list[str]:
     teams = app_cache.teams
     installation_ids = [team.installation_id for team in teams if team.installation_id is not None]
     access_tokens = []
-    
+    # TODO installation id 확인 후 수정 필요!
     installation_ids = ["71420197"]
 
     for installation_id in installation_ids:
@@ -185,40 +185,57 @@ async def fetch_all_branch_commits(
     return commits
 
 
-async def fetch_pull_requests(owner: str, repo: str, access_token: str, git_email: dict[str, int], git_id:dict[str, int]) -> List[PullRequestEntry]:
-    url = f"{BASE_URL}/repos/{owner}/{repo}/pulls?state=all"
+async def fetch_pull_requests(
+    owner: str,
+    repo: str,
+    access_token: str,
+    git_email: dict[str, int],
+    git_id: dict[str, int]
+) -> List[PullRequestEntry]:
+    base_url = f"{BASE_URL}/repos/{owner}/{repo}/pulls"
+    page = 1
+    per_page = 100
+    result = []
 
     try:
         async with httpx.AsyncClient() as client:
-            res = await client.get(url, headers=get_headers(access_token))
-            res.raise_for_status()
+            while True:
+                params = {"state": "all", "per_page": per_page, "page": page}
+                res = await client.get(base_url, headers=get_headers(access_token), params=params)
+                res.raise_for_status()
 
-            pull_requests = res.json()
-            result = []
+                pull_requests = res.json()
+                if not pull_requests:
+                    break  # 더 이상 PR이 없으면 종료
 
-            for pr in pull_requests:
-                username = pr["user"]["login"] if pr.get("user") else None
-                author_email = None
+                for pr in pull_requests:
+                    username = pr["user"]["login"] if pr.get("user") else None
+                    author_email = None
 
-                if username:
-                    author_email = await fetch_user_email(username, access_token, client)
-                
-                # TODO DB에서 매핑해야함.
-                author_email = git_email.get(author_email, author_email)
-                if not author_email:
-                    author_email = git_id.get(username, 0)
+                    if username:
+                        try:
+                            author_email = await fetch_user_email(username, access_token, client)
+                        except Exception:
+                            author_email = None
 
-                result.append(PullRequestEntry(
-                    repo=f"{owner}/{repo}",
-                    number=pr["number"],
-                    title=pr.get("title"),
-                    content=pr.get("body"),
-                    created_at=convert_utc_to_kst(pr["created_at"]),
-                    state=pr["state"],
-                    author=author_email or username  # fallback to username
-                ))
+                    mapped_author = git_email.get(author_email, None)
+                    if not mapped_author:
+                        mapped_author = git_id.get(username, 0)
 
-            return result
+                    result.append(PullRequestEntry(
+                        repo=f"{owner}/{repo}",
+                        number=pr["number"],
+                        title=pr.get("title"),
+                        content=pr.get("body"),
+                        created_at=convert_utc_to_kst(pr["created_at"]),
+                        state=pr["state"],
+                        author=mapped_author or username  # fallback
+                    ))
+
+                page += 1  # 다음 페이지로
+
+        return result
+
     except httpx.HTTPStatusError as e:
         print(f"HTTP error occurred while fetching PRs: {e.response.status_code} - {e.response.text}")
         return []
@@ -227,39 +244,58 @@ async def fetch_pull_requests(owner: str, repo: str, access_token: str, git_emai
         return []
 
 
-async def fetch_issues(owner: str, repo: str, access_token: str, git_email: dict[str, int], git_id: dict[str, int]) -> List[IssueEntry]:
-    url = f"{BASE_URL}/repos/{owner}/{repo}/issues?state=all"
+async def fetch_issues(
+    owner: str,
+    repo: str,
+    access_token: str,
+    git_email: dict[str, int],
+    git_id: dict[str, int]
+) -> List[IssueEntry]:
+    base_url = f"{BASE_URL}/repos/{owner}/{repo}/issues"
+    page = 1
+    per_page = 100
+    issues = []
 
     try:
         async with httpx.AsyncClient() as client:
-            res = await client.get(url, headers=get_headers(access_token))
-            res.raise_for_status()
+            while True:
+                params = {"state": "all", "per_page": per_page, "page": page}
+                res = await client.get(base_url, headers=get_headers(access_token), params=params)
+                res.raise_for_status()
 
-            issues = []
-            for issue in res.json():
-                if "pull_request" in issue:
-                    continue
+                issue_batch = res.json()
+                if not issue_batch:
+                    break  # 더 이상 가져올 이슈 없음
 
-                username = issue["user"]["login"] if issue.get("user") else None
-                author_email = None
+                for issue in issue_batch:
+                    if "pull_request" in issue:
+                        continue  # PR은 제외
 
-                if username:
-                    author_email = await fetch_user_email(username, access_token, client)
+                    username = issue["user"]["login"] if issue.get("user") else None
+                    author_email = None
 
-                author_email = git_email.get(author_email, author_email)
-                if not author_email:
-                    author_email = git_id.get(username, 0)
-                
-                issues.append(IssueEntry(
-                    repo=f"{owner}/{repo}",
-                    number=issue["number"],
-                    title=issue.get("title"),
-                    created_at=convert_utc_to_kst(issue["created_at"]),
-                    state=issue["state"],
-                    author=author_email or username
-                ))
+                    if username:
+                        try:
+                            author_email = await fetch_user_email(username, access_token, client)
+                        except Exception:
+                            author_email = None
 
-            return issues
+                    mapped_author = git_email.get(author_email, None)
+                    if not mapped_author:
+                        mapped_author = git_id.get(username, 0)
+
+                    issues.append(IssueEntry(
+                        repo=f"{owner}/{repo}",
+                        number=issue["number"],
+                        title=issue.get("title"),
+                        created_at=convert_utc_to_kst(issue["created_at"]),
+                        state=issue["state"],
+                        author=mapped_author or username
+                    ))
+
+                page += 1  # 다음 페이지로 이동
+
+        return issues
 
     except httpx.HTTPStatusError as e:
         print(f"HTTP error occurred while fetching issues: {e.response.status_code} - {e.response.text}")
