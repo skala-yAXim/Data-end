@@ -56,8 +56,6 @@ def get_installation_access_token(jwt_token: str) -> list[str]:
     teams = app_cache.teams
     installation_ids = [team.installation_id for team in teams if team.installation_id is not None]
     access_tokens = []
-    # TODO installation id 확인 후 수정 필요!
-    installation_ids = ["71420197"]
 
     for installation_id in installation_ids:
         access_token_url = f"https://api.github.com/app/installations/{installation_id}/access_tokens"
