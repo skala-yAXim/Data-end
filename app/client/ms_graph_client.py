@@ -244,7 +244,7 @@ def fetch_drive_files(access_token: str, drive_id: str, user_info: dict[str, int
     for item in data:
         filename = item.get("name")
         size = item.get("size", 0)
-        last_modified = convert_utc_to_kst(item.get("lastModifiedDateTime"))
+        last_modified = item.get("lastModifiedDateTime")
         url_link = item.get("webUrl", "")
         file_type = (
             item.get("file", {}).get("mimeType") if "file" in item
