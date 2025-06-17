@@ -5,17 +5,14 @@ from app.extractor.email_extractor import extract_email_content
 from app.schemas.email_activity import EmailEntry
 from app.common.config import EMAIL_COLLECTION_NAME, MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_TENANT_ID
 from app.vectordb.uploader import upload_data_to_db
-from app.common.cache import app_cache
 
-async def save_all_email_data():
+async def save_all_email_data(db: Session):
     # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정
     token = get_access_token(client_id=MICROSOFT_CLIENT_ID, client_secret=MICROSOFT_CLIENT_SECRET, tenant_id=MICROSOFT_TENANT_ID)
     
     all_emails: List[EmailEntry] = []
     
     all_users = fetch_user_email_ids(token)
-
-    user_info = app_cache.user_email
     
     for user in all_users:
         print(f"[INFO] 사용자 '{user}'의 메일을 조회 중...")
@@ -26,7 +23,7 @@ async def save_all_email_data():
         all_emails.extend(inbox)
         all_emails.extend(sent)
     
-    records = [extract_email_content(email, user_info) for email in all_emails]
+    records = [extract_email_content(email, db) for email in all_emails]
     if records:
         upload_data_to_db(collection_name=EMAIL_COLLECTION_NAME, records=records)
         

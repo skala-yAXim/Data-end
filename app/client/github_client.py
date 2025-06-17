@@ -6,11 +6,12 @@ from cryptography.hazmat.primitives import serialization
 import httpx
 import jwt
 import requests
+from sqlalchemy.orm import Session
 
 from app.client.utils import parse_last_page
 from app.common.utils import convert_utc_to_kst
 from app.schemas.github_activity import CommitEntry, IssueEntry, PullRequestEntry, ReadmeInfo
-from app.common.cache import app_cache
+from app.rdb.repository import find_all_teams
 
 BASE_URL = "https://api.github.com"
 
@@ -40,7 +41,7 @@ def create_jwt_token(app_id: str, private_key) -> str:
     
     return token
 
-def get_installation_access_token(jwt_token: str) -> list[str]:
+def get_installation_access_token(jwt_token: str, db: Session) -> list[str]:
     headers = {
         "Authorization": f"Bearer {jwt_token}",
         "Accept": "application/vnd.github+json"
@@ -54,7 +55,7 @@ def get_installation_access_token(jwt_token: str) -> list[str]:
     if not installations:
         raise Exception("No installations found for this GitHub App.")
 
-    teams = app_cache.teams
+    teams = find_all_teams(db)
     installation_ids = [team.installation_id for team in teams if team.installation_id is not None]
     access_tokens = []
 
@@ -187,7 +188,6 @@ async def fetch_all_branch_commits(
             raise
 
     return commits
-
 
 
 async def fetch_pull_requests(

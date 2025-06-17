@@ -23,35 +23,35 @@ def read_root():
 
 
 @router.get("/github/data", response_model=List[GitActivity])
-async def get_github_data():
+async def get_github_data(db: Session = Depends(get_db)):
     """
     설치된 모든 GitHub repository에 대해 커밋, PR, 이슈 데이터를 저장하여 반환합니다.
     """
-    data = await save_github_data()
+    data = await save_github_data(db)
     return data
 
 @router.get("/outlook/data", response_model=List[EmailEntry])
-async def get_outlook_data():
+async def get_outlook_data(db: Session = Depends(get_db)):
     """
     모든 사용자의 outlook 이메일 데이터를 저장 후 반환합니다.
     """
-    data = await save_all_email_data()
+    data = await save_all_email_data(db)
     return data
 
 @router.get("/teams/post", response_model=List[PostEntry])
-async def get_teams_post_data():
+async def get_teams_post_data(db: Session = Depends(get_db)):
     """
     조직 내 Teams 게시물 데이터를 저장 후 반환합니다.
     """
-    data = await save_teams_posts_data()
+    data = await save_teams_posts_data(db)
     return data
 
 @router.get("/document/data", response_model=List[DocsEntry])
-async def get_document_data():
+async def get_document_data(db: Session = Depends(get_db)):
     """
     조직 내 문서 데이터를 저장 후 반환합니다.
     """
-    data = await save_docs_data()
+    data = await save_docs_data(db)
     return data
 
 @router.get("/collections")
