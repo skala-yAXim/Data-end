@@ -31,9 +31,9 @@ def save_user_activities_to_rdb(target_date: str, db: Session):
                 teams_reply=teams.get("reply"),
                 email_send=email.get("sender"),
                 email_receive=email.get("receiver"),
-                docs_docx=docs.get("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-                docs_xlsx=docs.get("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-                docs_pptx=docs.get("application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+                docs_docx=docs.get("docx"),
+                docs_xlsx=docs.get("xlsx"),
+                docs_pptx=docs.get("pptx"),
                 docs_etc=docs.get("else"),
                 git_pull_request=git.get("pull_request"),
                 git_commit=git.get("commit"),
@@ -148,22 +148,16 @@ def email_report(client: QdrantClient, user: User, start_str: str, end_str: str)
 
 
 def docs_report(client: QdrantClient, user: User, start_str: str, end_str: str) -> dict:
+    
     metadata_combinations = [
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        "docx", 
+        "xslx",
+        "pptx",
     ]
-
-    # TODO: VectorDB에 적재되는 type이 수정되면 바뀌어야 함
-    # metadata_combinations = [
-    #     "docx", 
-    #     "xslx",
-    #     "pptx",
-    #     "txt"
-    # ]
 
     result = {}
     sum = 0
+    unique_file_names = set()
 
     for metadata in metadata_combinations:
         count = client.count(
@@ -184,6 +178,10 @@ def docs_report(client: QdrantClient, user: User, start_str: str, end_str: str) 
                             FieldCondition(
                                 key="type",
                                 match=MatchValue(value=metadata)
+                            ),
+                            FieldCondition(
+                                key="chunk_id",
+                                match=MatchValue(value=0)
                             )
                         ]
                     ),
@@ -207,6 +205,10 @@ def docs_report(client: QdrantClient, user: User, start_str: str, end_str: str) 
                                     gte=start_str,
                                     lte=end_str
                                 )
+                            ),
+                            FieldCondition(
+                                key="chunk_id",
+                                match=MatchValue(value=0)
                             )
                         ]
                     ),

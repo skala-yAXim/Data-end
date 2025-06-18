@@ -115,7 +115,6 @@ async def fetch_all_branch_commits(
     repo: str,
     access_token: str,
     git_email: dict[str, int],
-    git_id: dict[str, int],
     limit_per_branch: int = None
 ) -> List[CommitEntry]:
     branches_url = f"{BASE_URL}/repos/{owner}/{repo}/branches"
