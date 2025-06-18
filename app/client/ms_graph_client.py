@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import mimetypes
 import os
 import re
 from sqlalchemy.orm import Session
@@ -244,12 +245,19 @@ def fetch_drive_files(access_token: str, drive_id: str, user_info: dict[str, int
     for item in data:
         filename = item.get("name")
         size = item.get("size", 0)
-        last_modified = convert_utc_to_kst(item.get("lastModifiedDateTime"))
+        last_modified = item.get("lastModifiedDateTime")
         url_link = item.get("webUrl", "")
-        file_type = (
-            item.get("file", {}).get("mimeType") if "file" in item
-            else "folder" if "folder" in item else "unknown"
-        )
+        if "folder" in item:
+            file_type = "folder"
+        elif "file" in item:
+            mime_type = item["file"].get("mimeType")
+            ext = mimetypes.guess_extension(mime_type)
+            if ext:
+                file_type = ext.lstrip(".")
+            else:
+                file_type = "unknown"
+        else:
+            file_type = "unknown"
         file_id = item.get("id", "unknown")
 
 
