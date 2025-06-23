@@ -151,7 +151,7 @@ def docs_report(client: QdrantClient, user: User, start_str: str, end_str: str) 
     
     metadata_combinations = [
         "docx", 
-        "xslx",
+        "xlsx",
         "pptx",
     ]
 
