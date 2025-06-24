@@ -1,6 +1,9 @@
+from app.common.config import EMAIL_COLLECTION_NAME, GIT_COLLECTION_NAME, TEAMS_COLLECTION_NAME
+from app.extractor.github_activity_extractor import extract_record_from_commit_entry, extract_record_from_issue_entry, extract_record_from_pull_request_entry
+from app.extractor.teams_post_extractor import create_records_from_post_entry
 from app.schemas.docs_activity import DocsEntry
 from app.schemas.email_activity import EmailEntry
-from app.schemas.github_activity import GitActivity, ReadmeInfo
+from app.schemas.github_activity import GitActivity
 from app.schemas.teams_post_activity import PostEntry
 from app.pipeline.docs_pipeline import save_docs_data
 from app.pipeline.email_pipeline import save_all_email_data
@@ -13,7 +16,9 @@ from fastapi import APIRouter, Request, Depends, Path
 from sqlalchemy.orm import Session
 from typing import List
 
+from app.test_data_functions import extract_email_record, load_commits_from_json, load_emails_from_json, load_issues_from_json, load_posts_from_json, load_pull_requests_from_json
 from app.vectordb.client import flush_all_collections
+from app.vectordb.uploader import upload_data_to_db
 
 router = APIRouter()
 
@@ -105,3 +110,40 @@ def get_vector_user_activity(
 @router.get("/flush")
 def flush_collections(request: Request):
     return flush_all_collections()
+
+@router.get("/git-test-data")
+def get_git_test_data():
+    commits = load_commits_from_json("data/commit_entries_mock.json")
+    prs = load_pull_requests_from_json("data/pull_requests_mock.json")
+    issues = load_issues_from_json("data/git_issue_data.json")
+    
+    commit_records = [extract_record_from_commit_entry(commit) for commit in commits]
+    pr_records = [extract_record_from_pull_request_entry(pr) for pr in prs]
+    issue_records = [extract_record_from_issue_entry(issue) for issue in issues]
+    
+    # upload_data_to_db(collection_name="Git-test", records = commit_records)
+    # upload_data_to_db(collection_name="Git-test", records = pr_records)
+    # upload_data_to_db(collection_name="Git-test", records = issue_records)
+    
+    upload_data_to_db(collection_name=GIT_COLLECTION_NAME, records = commit_records)
+    upload_data_to_db(collection_name=GIT_COLLECTION_NAME, records = pr_records)
+    upload_data_to_db(collection_name=GIT_COLLECTION_NAME, records = issue_records)
+    
+    return
+
+@router.get("/email-test-data")
+def get_email_test_data():
+    emails = load_emails_from_json("data/email_data.json")
+    email_records = [extract_email_record(email) for email in emails]
+    upload_data_to_db(collection_name=EMAIL_COLLECTION_NAME, records = email_records)
+    
+    
+@router.get("/teams-test-data")
+def get_teams_test_data():
+    teams = load_posts_from_json("data/teams_post_data.json")
+    teams_records = []
+    for team in teams:
+        preprocessed_docs = create_records_from_post_entry(team)
+        teams_records.extend(preprocessed_docs)
+
+    upload_data_to_db(collection_name=TEAMS_COLLECTION_NAME, records = teams_records)
