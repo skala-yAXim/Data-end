@@ -23,12 +23,12 @@ from app.vectordb.uploader import upload_data_to_db
 
 router = APIRouter()
 
-@router.get("/")
+@router.get("/", tags=["Root"])
 def read_root():
     return {"message": "Hello from FastAPI"}
 
 
-@router.get("/github/data", response_model=List[GitActivity])
+@router.get("/github/data", response_model=List[GitActivity], tags=["실제 데이터 수집"])
 async def get_github_data(db: Session = Depends(get_db)):
     """
     설치된 모든 GitHub repository에 대해 커밋, PR, 이슈 데이터를 저장하여 반환합니다.
@@ -36,7 +36,7 @@ async def get_github_data(db: Session = Depends(get_db)):
     data = await save_github_data(db)
     return data
 
-@router.get("/outlook/data", response_model=List[EmailEntry])
+@router.get("/outlook/data", response_model=List[EmailEntry], tags=["실제 데이터 수집"])
 async def get_outlook_data(db: Session = Depends(get_db)):
     """
     모든 사용자의 outlook 이메일 데이터를 저장 후 반환합니다.
@@ -44,7 +44,7 @@ async def get_outlook_data(db: Session = Depends(get_db)):
     data = await save_all_email_data(db)
     return data
 
-@router.get("/teams/post", response_model=List[PostEntry])
+@router.get("/teams/post", response_model=List[PostEntry], tags=["실제 데이터 수집"])
 async def get_teams_post_data(db: Session = Depends(get_db)):
     """
     조직 내 Teams 게시물 데이터를 저장 후 반환합니다.
@@ -52,7 +52,7 @@ async def get_teams_post_data(db: Session = Depends(get_db)):
     data = await save_teams_posts_data(db)
     return data
 
-@router.get("/document/data", response_model=List[DocsEntry])
+@router.get("/document/data", response_model=List[DocsEntry], tags=["실제 데이터 수집"])
 async def get_document_data(db: Session = Depends(get_db)):
     """
     조직 내 문서 데이터를 저장 후 반환합니다.
@@ -68,35 +68,35 @@ def list_collections(request: Request):
     qdrant = request.app.state.qdrant_client
     return qdrant.get_collections()
 
-@router.get("/team/all")
+@router.get("/team/all", tags=["RDB 데이터"])
 def get_all_teams(db: Session = Depends(get_db)):
     """
     Teams 게시물에 대한 분석 데이터를 반환합니다.
     """
     return find_all_teams(db)
 
-@router.get("/user/all")
+@router.get("/user/all", tags=["RDB 데이터"])
 def get_all_users(db: Session = Depends(get_db)):
     """
     모든 사용자 정보를 반환합니다.
     """
     return find_all_users(db)
 
-@router.get("/team-member/all")
+@router.get("/team-member/all", tags=["RDB 데이터"])
 def get_all_team_members(db: Session = Depends(get_db)):
     """
     모든 팀 멤버 정보를 반환합니다.
     """
     return find_all_team_members(db)
 
-@router.get("/git-hub/all")
+@router.get("/git-hub/all", tags=["RDB 데이터"])
 def get_all_team_members(db: Session = Depends(get_db)):
     """
     모든 팀 멤버 정보를 반환합니다.
     """
     return find_all_git_info(db)
 
-@router.get("/vectordb/userActivity/{target_date}")
+@router.get("/vectordb/userActivity/{target_date}", tags=["RDB 데이터"])
 def get_vector_user_activity(
     target_date: str = Path(..., description="기준 날짜 (YYYY-MM-DD 형식) / 가급적 금요일로 테스트바랍니다.."),
     db: Session = Depends(get_db)
@@ -112,7 +112,7 @@ def get_vector_user_activity(
 def flush_collections(request: Request):
     return flush_all_collections()
 
-@router.get("/git-test-data")
+@router.get("/git-test-data", tags=["테스트 데이터 수집"])
 def get_git_test_data():
     commits = load_commits_from_json("data/commit_entries_mock.json")
     prs = load_pull_requests_from_json("data/pull_requests_mock.json")
@@ -128,7 +128,7 @@ def get_git_test_data():
     
     return
 
-@router.get("/email-test-data")
+@router.get("/email-test-data", tags=["테스트 데이터 수집"])
 def get_email_test_data(
     db: Session = Depends(get_db)
 ):
@@ -137,7 +137,7 @@ def get_email_test_data(
     upload_data_to_db(collection_name=EMAIL_COLLECTION_NAME, records = email_records)
     
     
-@router.get("/teams-test-data")
+@router.get("/teams-test-data", tags=["테스트 데이터 수집"])
 def get_teams_test_data():
     teams = load_posts_from_json("data/teams_post_data.json")
     teams_records = []
