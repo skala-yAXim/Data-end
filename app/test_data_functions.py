@@ -74,29 +74,13 @@ def load_emails_from_json(file_path: str) -> List[EmailEntry]:
             receivers=entry['receivers'],
             subject=entry['subject'],
             content=entry['content'],
-            date=datetime.fromisoformat(entry['date']+"+09:00"),
+            date=datetime.fromisoformat(entry['date']),
             conversation_id=entry.get('conversation_id'),
             attachment_list=entry.get('attachment_list')
         )
         emails.append(email)
 
     return emails
-
-def extract_email_record(email: EmailEntry):
-  attachments_text = ", ".join(email.attachment_list) if email.attachment_list else "None"
-  combined_text = f"Content: {email.content.strip()}\nAttachments: {attachments_text}"
-  
-  return BaseRecord[EmailMetadata](
-      text=combined_text,
-      metadata=EmailMetadata(
-          author=email.author,
-          sender=email.sender,
-          receivers=email.receivers,
-          subject=email.subject,
-          date=email.date,
-          conversation_id=email.conversation_id
-      )
-  )
 
 def load_posts_from_json(file_path: str) -> List[PostEntry]:
     with open(file_path, 'r', encoding='utf-8') as f:

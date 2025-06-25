@@ -1,4 +1,5 @@
-from app.common.config import EMAIL_COLLECTION_NAME, GIT_COLLECTION_NAME, MICROSOFT_CLIENT_ID, TEAMS_COLLECTION_NAME
+from app.common.config import EMAIL_COLLECTION_NAME, GIT_COLLECTION_NAME, TEAMS_COLLECTION_NAME
+from app.extractor.email_extractor import extract_email_content
 from app.extractor.github_activity_extractor import extract_record_from_commit_entry, extract_record_from_issue_entry, extract_record_from_pull_request_entry
 from app.extractor.teams_post_extractor import create_records_from_post_entry
 from app.schemas.docs_activity import DocsEntry
@@ -16,7 +17,7 @@ from fastapi import APIRouter, Request, Depends, Path
 from sqlalchemy.orm import Session
 from typing import List
 
-from app.test_data_functions import extract_email_record, load_commits_from_json, load_emails_from_json, load_issues_from_json, load_posts_from_json, load_pull_requests_from_json
+from app.test_data_functions import load_commits_from_json, load_emails_from_json, load_issues_from_json, load_posts_from_json, load_pull_requests_from_json
 from app.vectordb.client import flush_all_collections
 from app.vectordb.uploader import upload_data_to_db
 
@@ -121,10 +122,6 @@ def get_git_test_data():
     pr_records = [extract_record_from_pull_request_entry(pr) for pr in prs]
     issue_records = [extract_record_from_issue_entry(issue) for issue in issues]
     
-    # upload_data_to_db(collection_name="Git-test", records = commit_records)
-    # upload_data_to_db(collection_name="Git-test", records = pr_records)
-    # upload_data_to_db(collection_name="Git-test", records = issue_records)
-    
     upload_data_to_db(collection_name=GIT_COLLECTION_NAME, records = commit_records)
     upload_data_to_db(collection_name=GIT_COLLECTION_NAME, records = pr_records)
     upload_data_to_db(collection_name=GIT_COLLECTION_NAME, records = issue_records)
@@ -132,9 +129,11 @@ def get_git_test_data():
     return
 
 @router.get("/email-test-data")
-def get_email_test_data():
-    emails = load_emails_from_json("data/email_data.json")
-    email_records = [extract_email_record(email) for email in emails]
+def get_email_test_data(
+    db: Session = Depends(get_db)
+):
+    emails = load_emails_from_json("data/full_email_data.json")
+    email_records = [extract_email_content(email, db) for email in emails]
     upload_data_to_db(collection_name=EMAIL_COLLECTION_NAME, records = email_records)
     
     

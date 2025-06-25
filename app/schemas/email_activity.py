@@ -3,7 +3,7 @@ from typing import List, Optional
 from datetime import datetime
 
 class EmailEntry(BaseModel):
-    author: int
+    author: str
     sender: str
     receivers: List[str]
     subject: str
