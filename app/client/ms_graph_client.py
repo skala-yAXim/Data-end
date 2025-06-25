@@ -106,9 +106,14 @@ def fetch_replies_for_message(token: str, team_id: str, channel_id: str, message
     if response.status_code == 200:
         reply_data = response.json().get("value", [])
         for reply in reply_data:
-            reply_author_id = reply.get("from", {}).get("user", {}).get("id", "알 수 없음")
-            reply_author = get_user_email(reply_author_id, token)
-            author = user_email.get(reply_author, 0)
+            from_info = reply.get("from")
+            if from_info is None:
+                author = 0
+            else:
+                reply_author_id = from_info.get("user", {}).get("id", "알 수 없음")
+                reply_author = get_user_email(reply_author_id, token)
+                author = user_email.get(reply_author, 0)
+            
             reply_content = reply.get("body", {}).get("content", "")
             reply_date = convert_utc_to_kst(reply.get("createdDateTime", ""))
             
@@ -151,7 +156,6 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str, db: Session) 
 
         data = response.json()
         for item in data.get("value", []):
-            # print(item)
             from_info = item.get("from")
             if from_info is None:
                 author = 0
