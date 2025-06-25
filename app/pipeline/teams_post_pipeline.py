@@ -27,7 +27,6 @@ async def save_teams_posts_data(db: Session):
                 channel_id = channel["id"]
                 channel_name = channel.get("displayName", "알 수 없는 채널")
                 print(f"  └ 채널: {channel_name} (ID: {channel_id}) 메시지 조회 중...")
-
                 channel_posts = fetch_channel_posts(token, team_id, channel_id, db)
                 team_posts.extend(channel_posts)
 

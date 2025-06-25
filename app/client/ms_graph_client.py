@@ -99,16 +99,20 @@ def fetch_replies_for_message(token: str, team_id: str, channel_id: str, message
         "Authorization": f"Bearer {token}",
         "Accept": "application/json"
     }
-
     response = requests.get(endpoint, headers=headers)
     replies: List[ReplyEntry] = []
 
     if response.status_code == 200:
         reply_data = response.json().get("value", [])
         for reply in reply_data:
-            reply_author_id = reply.get("from", {}).get("user", {}).get("id", "알 수 없음")
-            reply_author = get_user_email(reply_author_id, token)
-            author = user_email.get(reply_author, 0)
+            from_info = reply.get("from")
+            if from_info is None:
+                author = 0
+            else:
+                reply_author_id = reply.get("from", {}).get("user", {}).get("id", "알 수 없음")
+                reply_author = get_user_email(reply_author_id, token)
+                author = user_email.get(reply_author, 0)
+            
             reply_content = reply.get("body", {}).get("content", "")
             reply_date = convert_utc_to_kst(reply.get("createdDateTime", ""))
             
@@ -148,10 +152,9 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str, db: Session) 
             print(f"메시지 조회 실패 (팀:{team_id}, 채널:{channel_id}): {response.status_code}")
             print(response.text)
             break
-
+        
         data = response.json()
         for item in data.get("value", []):
-            # print(item)
             from_info = item.get("from")
             if from_info is None:
                 author = 0
@@ -169,7 +172,7 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str, db: Session) 
                     author = 0
             
             subject = item.get("subject") or ""
-            summary = item.get("summary") or ""       
+            summary = item.get("summary") or ""     
             content = item.get("body", {}).get("content", "")
             date = convert_utc_to_kst(item.get("createdDateTime", ""))
             
@@ -191,7 +194,6 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str, db: Session) 
                     name = att.get("name")
                     if name:
                         attachments.append(name)
-
             replies: List[ReplyEntry] = fetch_replies_for_message(token, team_id, channel_id, item["id"], user_email)
 
             if author == "Jira Cloud" and application_content[0]:

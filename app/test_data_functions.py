@@ -18,7 +18,7 @@ def load_commits_from_json(file_path: str) -> List[CommitEntry]:
             repo=entry['repo'],
             sha=entry['sha'],
             message=entry.get('message'),
-            date=datetime.fromisoformat(entry['date']),
+            date=datetime.fromisoformat(entry['date']+"+09:00"),
             author=entry.get('author')
         )
         commits.append(commit)
@@ -36,7 +36,7 @@ def load_pull_requests_from_json(file_path: str) -> List[PullRequestEntry]:
             number=entry['number'],
             title=entry.get('title'),
             content=entry.get('content'),
-            created_at=datetime.fromisoformat(entry['created_at']),
+            created_at=datetime.fromisoformat(entry['created_at']+"+09:00"),
             state=entry['state'],
             author=entry.get('author')
         )
@@ -54,7 +54,7 @@ def load_issues_from_json(file_path: str) -> List[IssueEntry]:
             repo=entry['repo'],
             number=entry['number'],
             title=entry.get('title'),
-            created_at=datetime.fromisoformat(entry['created_at']),
+            created_at=datetime.fromisoformat(entry['created_at']+"+09:00"),
             state=entry['state'],
             author=entry.get('author')
         )
@@ -74,7 +74,7 @@ def load_emails_from_json(file_path: str) -> List[EmailEntry]:
             receivers=entry['receivers'],
             subject=entry['subject'],
             content=entry['content'],
-            date=datetime.fromisoformat(entry['date']),
+            date=datetime.fromisoformat(entry['date']+"+09:00"),
             conversation_id=entry.get('conversation_id'),
             attachment_list=entry.get('attachment_list')
         )
@@ -111,7 +111,7 @@ def load_posts_from_json(file_path: str) -> List[PostEntry]:
                 ReplyEntry(
                     author=reply['author'],
                     content=reply['content'],
-                    date=datetime.fromisoformat(reply['date']),
+                    date=datetime.fromisoformat(reply['date']+"+09:00"),
                     attachments=reply.get('attachments')
                 )
                 for reply in entry['replies']
@@ -125,7 +125,7 @@ def load_posts_from_json(file_path: str) -> List[PostEntry]:
             replies=replies,
             attachments=entry.get('attachments'),
             application_content=entry.get('application_content'),
-            date=datetime.fromisoformat(entry['date'])
+            date=datetime.fromisoformat(entry['date']+"+09:00")
         )
         posts.append(post)
 

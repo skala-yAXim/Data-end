@@ -1,4 +1,4 @@
-from app.common.config import EMAIL_COLLECTION_NAME, GIT_COLLECTION_NAME, TEAMS_COLLECTION_NAME
+from app.common.config import EMAIL_COLLECTION_NAME, GIT_COLLECTION_NAME, MICROSOFT_CLIENT_ID, TEAMS_COLLECTION_NAME
 from app.extractor.github_activity_extractor import extract_record_from_commit_entry, extract_record_from_issue_entry, extract_record_from_pull_request_entry
 from app.extractor.teams_post_extractor import create_records_from_post_entry
 from app.schemas.docs_activity import DocsEntry
