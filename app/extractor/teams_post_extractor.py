@@ -2,6 +2,7 @@ from typing import List, Union
 from app.common.utils import clean_html
 from app.schemas.teams_post_activity import PostEntry, ReplyEntry
 from app.vectordb.schema import BaseRecord, TeamsPostMetadata
+import re
 
 def create_records_from_post_entry(team_post: PostEntry) -> List[BaseRecord[TeamsPostMetadata]]:
     docs: List[BaseRecord[TeamsPostMetadata]] = []
@@ -44,7 +45,14 @@ def parse_post_data(
         for attachment in data.attachments:
             text_parts.append(f"Attachment: {attachment}")
 
-    combined_text = "\n".join(text_parts).strip()
+    cleaned_text_parts = []
+    for part in text_parts:
+        cleaned = part.replace('\t', '')              # 탭 제거
+        cleaned = cleaned.replace('&nbsp;', ' ')      # HTML 비공개 공백 제거
+        cleaned = cleaned.replace('\u00A0', ' ')      # 유니코드 비공개 공백 제거
+        cleaned_text_parts.append(cleaned)
+
+    combined_text = "\n".join(cleaned_text_parts).strip()
 
     metadata = TeamsPostMetadata(
         author=data.author,
