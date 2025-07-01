@@ -227,7 +227,13 @@ def fetch_all_sites(access_token: str) -> List[dict]:
     
     return response.json().get("value", [])
 
-def fetch_drive_files(access_token: str, drive_id: str, user_info: dict[str, int], folder_id: Optional[str] = None) -> List[DocsEntry]:
+def fetch_drive_files(
+    access_token: str,
+    drive_id: str,
+    user_info: dict[str, int],
+    folder_id: Optional[str] = None,
+    current_path: str = ""
+) -> List[DocsEntry]:
     entries: List[DocsEntry] = []
 
     # 폴더 경로 설정
@@ -249,6 +255,7 @@ def fetch_drive_files(access_token: str, drive_id: str, user_info: dict[str, int
         size = item.get("size", 0)
         last_modified = item.get("lastModifiedDateTime")
         url_link = item.get("webUrl", "")
+
         if "folder" in item:
             file_type = "folder"
         elif "file" in item:
@@ -260,9 +267,8 @@ def fetch_drive_files(access_token: str, drive_id: str, user_info: dict[str, int
                 file_type = "unknown"
         else:
             file_type = "unknown"
+
         file_id = item.get("id", "unknown")
-
-
         authors = set()
 
         # 작성자 정보
@@ -286,13 +292,22 @@ def fetch_drive_files(access_token: str, drive_id: str, user_info: dict[str, int
                         user_id = user_info.get(email, 0)
                         authors.add(user_id)
 
+        full_path = f"{current_path}/{filename}".strip("/")
+
         # 폴더면 재귀적으로 내부 파일 가져오기
         if "folder" in item:
-            folder_items = fetch_drive_files(access_token, drive_id, user_info, item["id"])
+            folder_items = fetch_drive_files(
+                access_token,
+                drive_id,
+                user_info,
+                item["id"],
+                current_path=full_path
+            )
             entries.extend(folder_items)
         else:
             entry = DocsEntry(
                 filename=filename,
+                full_path=full_path,
                 author=list(authors),
                 last_modified=last_modified,
                 type=file_type,

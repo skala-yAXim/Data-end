@@ -40,7 +40,7 @@ def create_record_from_entry(contents: List[str], entry: DocsEntry) -> List[Base
             text=text,
             metadata=DocumentMetadata(
                 file_id=entry.file_id,
-                filename=entry.filename,
+                filename=entry.full_path,
                 author=entry.author,
                 last_modified=entry.last_modified,
                 type=entry.type,
