@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from app.common.config import EMAIL_COLLECTION_NAME, GIT_COLLECTION_NAME, TEAMS_COLLECTION_NAME
 from app.extractor.email_extractor import extract_email_content
 from app.extractor.github_activity_extractor import extract_record_from_commit_entry, extract_record_from_issue_entry, extract_record_from_pull_request_entry
@@ -33,7 +34,8 @@ async def get_github_data(db: Session = Depends(get_db)):
     """
     설치된 모든 GitHub repository에 대해 커밋, PR, 이슈 데이터를 저장하여 반환합니다.
     """
-    data = await save_github_data(db)
+    date = datetime.now() - timedelta(days=1)
+    data = await save_github_data(db, date)
     return data
 
 @router.get("/outlook/data", response_model=List[EmailEntry], tags=["실제 데이터 수집"])
@@ -41,7 +43,8 @@ async def get_outlook_data(db: Session = Depends(get_db)):
     """
     모든 사용자의 outlook 이메일 데이터를 저장 후 반환합니다.
     """
-    data = await save_all_email_data(db)
+    date = datetime.now() - timedelta(days=1)
+    data = await save_all_email_data(db, date)
     return data
 
 @router.get("/teams/post", response_model=List[PostEntry], tags=["실제 데이터 수집"])
@@ -49,7 +52,8 @@ async def get_teams_post_data(db: Session = Depends(get_db)):
     """
     조직 내 Teams 게시물 데이터를 저장 후 반환합니다.
     """
-    data = await save_teams_posts_data(db)
+    date = datetime.now() - timedelta(days=1)
+    data = await save_teams_posts_data(db, date)
     return data
 
 @router.get("/document/data", response_model=List[DocsEntry], tags=["실제 데이터 수집"])
@@ -57,7 +61,8 @@ async def get_document_data(db: Session = Depends(get_db)):
     """
     조직 내 문서 데이터를 저장 후 반환합니다.
     """
-    data = await save_docs_data(db)
+    date = datetime.now() - timedelta(days=1)
+    data = await save_docs_data(db, date)
     return data
 
 @router.get("/collections")

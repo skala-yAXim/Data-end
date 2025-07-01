@@ -1,5 +1,6 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
+from app.vectordb.client import flush_all_collections
 from apscheduler.schedulers.blocking import BlockingScheduler
 from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
@@ -20,22 +21,23 @@ def get_db_session() -> Session:
 # 매일 자정에 실행될 작업
 async def run_batch():
     db = get_db_session()
+    date = datetime.now() - timedelta(days=1)
     print(f"\n=== 배치 작업 시작: {datetime.now()} ===")
     try:
         print("GitHub 데이터 저장 시작...")
-        await save_github_data(db)
+        await save_github_data(db, date)
         print("GitHub 데이터 저장 완료")
 
         print("이메일 데이터 저장 시작...")
-        await save_all_email_data(db)
+        await save_all_email_data(db, date)
         print("이메일 데이터 저장 완료")
 
         print("Docs 데이터 저장 시작...")
-        await save_docs_data(db)
+        await save_docs_data(db, date)
         print("Docs 데이터 저장 완료")
 
         print("Teams 포스트 데이터 저장 시작...")
-        await save_teams_posts_data(db)
+        await save_teams_posts_data(db, date)
         print("Teams 포스트 데이터 저장 완료")
 
         print(f"=== 모든 배치 작업 완료: {datetime.now()} ===\n")
@@ -43,6 +45,11 @@ async def run_batch():
         print(f"에러 발생: {e}")
     finally:
         db.close()
+
+# 토요일 자정에 실행될 작업
+async def run_batch_with_flush():
+    await flush_all_collections()
+    await run_batch()
 
 
 # 매주 월요일 자정에 실행될 작업
@@ -68,8 +75,11 @@ async def run_all_jobs_for_friday():
 scheduler = BlockingScheduler(timezone=ZoneInfo("Asia/Seoul"))
 
 # 매일 자정 (00:00)에 실행
-# 목~토 자정에는 run_batch만 실행
-scheduler.add_job(lambda: asyncio.run(run_batch()), 'cron', day_of_week='sat,sun,mon,tue,wed,thu', hour=0, minute=0)
+# 일~목 자정에는 run_batch만 실행
+scheduler.add_job(lambda: asyncio.run(run_batch()), 'cron', day_of_week='sun,mon,tue,wed,thu', hour=0, minute=0)
+
+# 토요일 자정에는 flush 후 run_batch 실행
+scheduler.add_job(lambda: asyncio.run(run_batch_with_flush()), 'cron', day_of_week='sat', hour=0, minute=0)
 
 # 금요일 자정에는 run_batch → 통계 보고까지 함께 실행
 scheduler.add_job(lambda: asyncio.run(run_all_jobs_for_friday()), 'cron', day_of_week='fri', hour=0, minute=0)

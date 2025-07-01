@@ -134,7 +134,7 @@ def fetch_replies_for_message(token: str, team_id: str, channel_id: str, message
 
     return replies
 
-def fetch_channel_posts(token: str, team_id: str, channel_id: str, db: Session) -> List[PostEntry]:
+def fetch_channel_posts(token: str, team_id: str, channel_id: str, db: Session, date: datetime) -> List[PostEntry]:
     endpoint = f"https://graph.microsoft.com/v1.0/teams/{team_id}/channels/{channel_id}/messages"
     headers = {
         "Authorization": f"Bearer {token}",
@@ -145,6 +145,7 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str, db: Session) 
     url = endpoint
 
     user_email, user_name = get_user_emails_and_names(db)
+    target_date = date.date()
 
     while url:
         response = requests.get(url, headers=headers)
@@ -155,6 +156,11 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str, db: Session) 
         
         data = response.json()
         for item in data.get("value", []):
+            create_date = convert_utc_to_kst(item.get("createdDateTime", ""))
+            
+            if create_date.date() != target_date:
+                continue
+            
             from_info = item.get("from")
             if from_info is None:
                 author = 0
@@ -174,7 +180,7 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str, db: Session) 
             subject = item.get("subject") or ""
             summary = item.get("summary") or ""     
             content = item.get("body", {}).get("content", "")
-            date = convert_utc_to_kst(item.get("createdDateTime", ""))
+            
             
             attachments_raw = item.get("attachments", [])
 
@@ -206,7 +212,7 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str, db: Session) 
                 subject=subject,
                 summary=summary,
                 content=content,
-                date=date,
+                date=create_date,
                 attachments=attachments if attachments else [],
                 application_content=application_content,
                 replies=replies
@@ -230,9 +236,10 @@ def fetch_all_sites(access_token: str) -> List[dict]:
 def fetch_drive_files(
     access_token: str,
     drive_id: str,
+    date: datetime,
     user_info: dict[str, int],
     folder_id: Optional[str] = None,
-    current_path: str = ""
+    current_path: str = "",
 ) -> List[DocsEntry]:
     entries: List[DocsEntry] = []
 
@@ -249,16 +256,23 @@ def fetch_drive_files(
         raise Exception(f"파일 목록 조회 실패: {response.status_code} - {response.text}")
 
     data = response.json().get("value", [])
+    
+    target_date = date.date()
 
     for item in data:
         filename = item.get("name")
         size = item.get("size", 0)
-        last_modified = item.get("lastModifiedDateTime")
         url_link = item.get("webUrl", "")
 
         if "folder" in item:
             file_type = "folder"
         elif "file" in item:
+            last_modified_str = item.get("lastModifiedDateTime")
+            last_modified = datetime.fromisoformat(last_modified_str)
+            
+            if last_modified.date() != target_date:
+                continue
+            
             mime_type = item["file"].get("mimeType")
             ext = mimetypes.guess_extension(mime_type)
             if ext:
@@ -297,11 +311,12 @@ def fetch_drive_files(
         # 폴더면 재귀적으로 내부 파일 가져오기
         if "folder" in item:
             folder_items = fetch_drive_files(
-                access_token,
-                drive_id,
-                user_info,
-                item["id"],
-                current_path=full_path
+                access_token=access_token,
+                drive_id=drive_id,
+                user_info=user_info,
+                date = date,
+                folder_id=item["id"],
+                current_path=full_path,
             )
             entries.extend(folder_items)
         else:
@@ -309,7 +324,7 @@ def fetch_drive_files(
                 filename=filename,
                 full_path=full_path,
                 author=list(authors),
-                last_modified=last_modified,
+                last_modified=item.get("lastModifiedDateTime"),
                 type=file_type,
                 size=size,
                 file_id=file_id,
@@ -353,8 +368,18 @@ def fetch_user_email_ids(token: str) -> List[str]:
         print(response.text)
         return []
 
-def fetch_user_inbox_emails(token: str, user_email: str) -> List[EmailEntry]:
-    endpoint = f"https://graph.microsoft.com/v1.0/users/{user_email}/mailFolders/Inbox/messages?$expand=attachments"
+def fetch_user_inbox_emails(token: str, user_email: str, date: datetime) -> List[EmailEntry]:
+    start_of_day_kst = date.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day_kst = start_of_day_kst + timedelta(days=1)
+
+    start_of_day_utc = start_of_day_kst.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    end_of_day_utc = end_of_day_kst.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ') 
+    
+    endpoint = (
+        f"https://graph.microsoft.com/v1.0/users/{user_email}/mailFolders/Inbox/messages"
+        f"?$expand=attachments"
+        f"&$filter=receivedDateTime ge {start_of_day_utc} and receivedDateTime lt {end_of_day_utc}"
+    )
     headers = {
         "Authorization": f"Bearer {token}",
         "Prefer": 'outlook.body-content-type="text"'  # HTML 대신 plain text로 가져오도록 요청
@@ -400,8 +425,18 @@ def fetch_user_inbox_emails(token: str, user_email: str) -> List[EmailEntry]:
         print(response.text)
         return []
 
-def fetch_user_sent_emails(token: str, user_email: str) -> List[EmailEntry]:
-    endpoint = f"https://graph.microsoft.com/v1.0/users/{user_email}/mailFolders/SentItems/messages?$expand=attachments"
+def fetch_user_sent_emails(token: str, user_email: str, date: datetime) -> List[EmailEntry]:
+    start_of_day_kst = date.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day_kst = start_of_day_kst + timedelta(days=1)
+
+    start_of_day_utc = start_of_day_kst.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    end_of_day_utc = end_of_day_kst.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    
+    endpoint = (
+        f"https://graph.microsoft.com/v1.0/users/{user_email}/mailFolders/SentItems/messages"
+        f"?$expand=attachments"
+        f"&$filter=receivedDateTime ge {start_of_day_utc} and receivedDateTime lt {end_of_day_utc}"
+    )
     headers = {
         "Authorization": f"Bearer {token}",
         "Prefer": 'outlook.body-content-type="text"'  # HTML 대신 plain text로 가져오도록 요청

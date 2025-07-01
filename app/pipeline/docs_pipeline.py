@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 from sqlalchemy.orm import Session
 from typing import List
@@ -8,7 +9,7 @@ from app.schemas.docs_activity import DocsEntry
 from app.vectordb.uploader import upload_data_to_db
 from app.common.utils import get_user_emails
 
-async def save_docs_data(db: Session):
+async def save_docs_data(db: Session, date: datetime):
     # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정
     token = get_access_token(client_id=MICROSOFT_CLIENT_ID, client_secret=MICROSOFT_CLIENT_SECRET, tenant_id=MICROSOFT_TENANT_ID)
     
@@ -37,7 +38,7 @@ async def save_docs_data(db: Session):
             if not drive_id:
                 continue
 
-            docs = fetch_drive_files(token, drive_id, user_info)
+            docs = fetch_drive_files(access_token=token, drive_id=drive_id, user_info=user_info, date=date)
             all_docs.extend(docs)
 
         except Exception as e:
