@@ -96,3 +96,28 @@ class DailyUserActivity(Base):
     git_issue = Column(Integer, nullable=False)
 
     user = relationship("User", lazy="select")
+
+
+class DailyTeamActivity(Base):
+    __tablename__ = "daily_team_activity"
+
+    id = Column(Integer, primary_key=True, index=True)
+    team_id = Column(Integer, ForeignKey("team.id"), nullable=False)
+    report_date = Column(Date, nullable=False)
+    day = Column(SQLAlchemyEnum(Weekday, native_enum=False), nullable=False)
+    teams_post = Column(Integer, nullable=False)
+    teams_reply = Column(Integer, nullable=False)
+    email_send = Column(Integer, nullable=False)
+    email_receive = Column(Integer, nullable=False)
+    docs_docx = Column(Integer, nullable=False)
+    docs_xlsx = Column(Integer, nullable=False)
+    docs_pptx = Column(Integer, nullable=False)
+    docs_etc = Column(Integer, nullable=False)
+    git_pull_request = Column(Integer, nullable=False)
+    git_commit = Column(Integer, nullable=False)
+    git_issue = Column(Integer, nullable=False)
+
+    team = relationship("Team", lazy="select")
+
+
+

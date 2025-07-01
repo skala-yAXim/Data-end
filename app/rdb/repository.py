@@ -1,6 +1,5 @@
-from typing import Optional
 from sqlalchemy.orm import Session
-from app.rdb.schema import Team, User, TeamMember, GitInfo, DailyUserActivity
+from app.rdb.schema import Team, User, TeamMember, GitInfo, DailyUserActivity, DailyTeamActivity
 
 # 모든 팀 조회
 def find_all_teams(db: Session) -> list[Team]:
@@ -26,6 +25,13 @@ def flush_daily_user_activity_if_exists(db: Session):
 
     if exists:
         db.query(DailyUserActivity).delete()
+        db.commit()
+
+def flush_team_activity_if_exists(db: Session):
+    exists = db.query(DailyTeamActivity).first() is not None
+
+    if exists:
+        db.query(DailyTeamActivity).delete()
         db.commit()
 
 def delete_all_daily_user_activities(db: Session):

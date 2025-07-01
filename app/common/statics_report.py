@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, date
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue, DatetimeRange
 from app.rdb.schema import DailyUserActivity, User, Weekday
-from app.rdb.repository import save_daily_user_activity, flush_daily_user_activity_if_exists, find_all_users
+from app.rdb.repository import save_daily_user_activity, flush_daily_user_activity_if_exists, flush_team_activity_if_exists, find_all_users
 from app.common.config import TEAMS_COLLECTION_NAME, GIT_COLLECTION_NAME, EMAIL_COLLECTION_NAME, DOCS_COLLECTION_NAME
 from app.vectordb.client import get_qdrant_client
 
@@ -12,6 +12,7 @@ def save_user_activities_to_rdb(target_date: str, db: Session):
     data = load_user_activities_from_vector_db(date, db)
 
     flush_daily_user_activity_if_exists(db)
+    flush_team_activity_if_exists(db)
 
     for week in data:
         for day in week:
