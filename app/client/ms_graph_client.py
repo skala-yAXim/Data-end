@@ -109,7 +109,7 @@ def fetch_replies_for_message(token: str, team_id: str, channel_id: str, message
             if from_info is None:
                 author = 0
             else:
-                reply_author_id = reply.get("from", {}).get("user", {}).get("id", "알 수 없음")
+                reply_author_id = from_info.get("user", {}).get("id", "알 수 없음")
                 reply_author = get_user_email(reply_author_id, token)
                 author = user_email.get(reply_author, 0)
             
