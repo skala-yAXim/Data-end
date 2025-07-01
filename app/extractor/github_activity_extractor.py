@@ -11,6 +11,7 @@ def extract_record_from_commit_entry(
             author=commit_entry.author or 0,
             date=commit_entry.date,
             type="commit",
+            title=commit_entry.message,
             repo_name=commit_entry.repo,
             sha=commit_entry.sha
         )
@@ -20,11 +21,12 @@ def extract_record_from_pull_request_entry(
     pr_entry: PullRequestEntry,
 ) -> BaseRecord[GitPRMetadata]:
     return BaseRecord[GitPRMetadata](
-        text=((pr_entry.title or "") + "\n\n" + (pr_entry.content or "")).strip(),
+        text=(pr_entry.content or "").strip(),
         metadata=GitPRMetadata(
             author=pr_entry.author or 0,
             date=pr_entry.created_at,
             type="pull_request",
+            title=pr_entry.title,
             repo_name=pr_entry.repo,
             number=pr_entry.number,
             state=pr_entry.state
@@ -40,6 +42,7 @@ def extract_record_from_issue_entry(
             author=issue_entry.author or 0,
             date=issue_entry.created_at,
             type="issue",
+            title=issue_entry.title,
             repo_name=issue_entry.repo,
             number=issue_entry.number
         )

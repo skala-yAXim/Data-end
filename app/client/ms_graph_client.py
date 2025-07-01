@@ -99,7 +99,6 @@ def fetch_replies_for_message(token: str, team_id: str, channel_id: str, message
         "Authorization": f"Bearer {token}",
         "Accept": "application/json"
     }
-
     response = requests.get(endpoint, headers=headers)
     replies: List[ReplyEntry] = []
 
@@ -153,7 +152,7 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str, db: Session) 
             print(f"메시지 조회 실패 (팀:{team_id}, 채널:{channel_id}): {response.status_code}")
             print(response.text)
             break
-
+        
         data = response.json()
         for item in data.get("value", []):
             from_info = item.get("from")
@@ -173,7 +172,7 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str, db: Session) 
                     author = 0
             
             subject = item.get("subject") or ""
-            summary = item.get("summary") or ""       
+            summary = item.get("summary") or ""     
             content = item.get("body", {}).get("content", "")
             date = convert_utc_to_kst(item.get("createdDateTime", ""))
             
@@ -195,7 +194,6 @@ def fetch_channel_posts(token: str, team_id: str, channel_id: str, db: Session) 
                     name = att.get("name")
                     if name:
                         attachments.append(name)
-
             replies: List[ReplyEntry] = fetch_replies_for_message(token, team_id, channel_id, item["id"], user_email)
 
             if author == "Jira Cloud" and application_content[0]:
@@ -229,7 +227,13 @@ def fetch_all_sites(access_token: str) -> List[dict]:
     
     return response.json().get("value", [])
 
-def fetch_drive_files(access_token: str, drive_id: str, user_info: dict[str, int], folder_id: Optional[str] = None) -> List[DocsEntry]:
+def fetch_drive_files(
+    access_token: str,
+    drive_id: str,
+    user_info: dict[str, int],
+    folder_id: Optional[str] = None,
+    current_path: str = ""
+) -> List[DocsEntry]:
     entries: List[DocsEntry] = []
 
     # 폴더 경로 설정
@@ -251,6 +255,7 @@ def fetch_drive_files(access_token: str, drive_id: str, user_info: dict[str, int
         size = item.get("size", 0)
         last_modified = item.get("lastModifiedDateTime")
         url_link = item.get("webUrl", "")
+
         if "folder" in item:
             file_type = "folder"
         elif "file" in item:
@@ -262,9 +267,8 @@ def fetch_drive_files(access_token: str, drive_id: str, user_info: dict[str, int
                 file_type = "unknown"
         else:
             file_type = "unknown"
+
         file_id = item.get("id", "unknown")
-
-
         authors = set()
 
         # 작성자 정보
@@ -288,13 +292,22 @@ def fetch_drive_files(access_token: str, drive_id: str, user_info: dict[str, int
                         user_id = user_info.get(email, 0)
                         authors.add(user_id)
 
+        full_path = f"{current_path}/{filename}".strip("/")
+
         # 폴더면 재귀적으로 내부 파일 가져오기
         if "folder" in item:
-            folder_items = fetch_drive_files(access_token, drive_id, user_info, item["id"])
+            folder_items = fetch_drive_files(
+                access_token,
+                drive_id,
+                user_info,
+                item["id"],
+                current_path=full_path
+            )
             entries.extend(folder_items)
         else:
             entry = DocsEntry(
                 filename=filename,
+                full_path=full_path,
                 author=list(authors),
                 last_modified=last_modified,
                 type=file_type,

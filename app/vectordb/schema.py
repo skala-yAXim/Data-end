@@ -25,6 +25,7 @@ class GitCommitMetadata(BaseMetadata):
   author: int
   date: datetime
   type: str
+  title: str
   repo_name: str
   sha: str
 
@@ -32,6 +33,7 @@ class GitPRMetadata(BaseMetadata):
   author: int
   date: datetime
   type: str
+  title: str
   repo_name: str
   number: int
   state: str
@@ -40,6 +42,7 @@ class GitIssueMetadata(BaseMetadata):
   author: int
   date: datetime
   type: str
+  title: str
   repo_name: str
   number: int
 
