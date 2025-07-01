@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from apscheduler.schedulers.blocking import BlockingScheduler
 from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
@@ -20,22 +20,23 @@ def get_db_session() -> Session:
 # 매일 자정에 실행될 작업
 async def run_batch():
     db = get_db_session()
+    date = datetime.now() - timedelta(days=1)
     print(f"\n=== 배치 작업 시작: {datetime.now()} ===")
     try:
         print("GitHub 데이터 저장 시작...")
-        await save_github_data(db)
+        await save_github_data(db, date)
         print("GitHub 데이터 저장 완료")
 
         print("이메일 데이터 저장 시작...")
-        await save_all_email_data(db)
+        await save_all_email_data(db, date)
         print("이메일 데이터 저장 완료")
 
         print("Docs 데이터 저장 시작...")
-        await save_docs_data(db)
+        await save_docs_data(db, date)
         print("Docs 데이터 저장 완료")
 
         print("Teams 포스트 데이터 저장 시작...")
-        await save_teams_posts_data(db)
+        await save_teams_posts_data(db, date)
         print("Teams 포스트 데이터 저장 완료")
 
         print(f"=== 모든 배치 작업 완료: {datetime.now()} ===\n")

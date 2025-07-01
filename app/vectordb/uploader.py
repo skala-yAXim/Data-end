@@ -35,9 +35,10 @@ def upload_data_to_db(
             "payload": metadata
         })
     
-    client.upsert(
-        collection_name=collection_name,
-        points=points
-    )
+    if points:
+        client.upsert(
+            collection_name=collection_name,
+            points=points
+        )
     
     print("데이터 저장 완료!")

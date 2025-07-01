@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy.orm import Session
 from typing import List
 from app.client.ms_graph_client import fetch_all_teams, fetch_channel_posts, fetch_channels, get_access_token
@@ -6,7 +7,7 @@ from app.extractor.teams_post_extractor import create_records_from_post_entry
 from app.schemas.teams_post_activity import PostEntry
 from app.vectordb.uploader import upload_data_to_db
 
-async def save_teams_posts_data(db: Session):
+async def save_teams_posts_data(db: Session, date: datetime):
     # TODO: 오늘 날짜 데이터만 긁어올 수 있도록 수정
     token = get_access_token(client_id=MICROSOFT_CLIENT_ID, client_secret=MICROSOFT_CLIENT_SECRET, tenant_id=MICROSOFT_TENANT_ID)
     
@@ -27,7 +28,7 @@ async def save_teams_posts_data(db: Session):
                 channel_id = channel["id"]
                 channel_name = channel.get("displayName", "알 수 없는 채널")
                 print(f"  └ 채널: {channel_name} (ID: {channel_id}) 메시지 조회 중...")
-                channel_posts = fetch_channel_posts(token, team_id, channel_id, db)
+                channel_posts = fetch_channel_posts(token, team_id, channel_id, db, date)
                 team_posts.extend(channel_posts)
 
         except Exception as e:

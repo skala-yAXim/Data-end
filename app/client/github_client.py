@@ -1,4 +1,5 @@
 from base64 import b64decode
+from datetime import datetime
 from sqlalchemy.orm import Session
 import time
 from typing import List, Optional, Tuple
@@ -115,11 +116,13 @@ async def fetch_all_branch_commits(
     repo: str,
     access_token: str,
     git_email: dict[str, int],
+    date: datetime,
     limit_per_branch: int = None
 ) -> List[CommitEntry]:
     branches_url = f"{BASE_URL}/repos/{owner}/{repo}/branches"
     commits = []
     seen_shas = set()
+    target_date_kst = date.date()
 
     async with httpx.AsyncClient() as client:
         try:
@@ -163,12 +166,18 @@ async def fetch_all_branch_commits(
                         commit = item["commit"]
                         author_email = commit["author"]["email"] if commit.get("author") else None
                         author_id = git_email.get(author_email, 0)
-
+                        
+                        commit_datetime_kst = convert_utc_to_kst(commit["author"]["date"])
+                        commit_date_kst = commit_datetime_kst.date()
+                        
+                        if commit_date_kst != target_date_kst:
+                            continue
+                        
                         commits.append(CommitEntry(
                             repo=f"{owner}/{repo}",
                             sha=sha,
                             message=commit.get("message"),
-                            date=convert_utc_to_kst(commit["author"]["date"]),
+                            date=commit_datetime_kst,
                             author=author_id
                         ))
 
@@ -194,11 +203,13 @@ async def fetch_pull_requests(
     repo: str,
     access_token: str,
     git_email: dict[str, int],
-    git_id: dict[str, int]
+    git_id: dict[str, int],
+    date: datetime
 ) -> List[PullRequestEntry]:
     base_url = f"{BASE_URL}/repos/{owner}/{repo}/pulls"
     per_page = 100
     result = []
+    target_date_kst = date.date()
 
     try:
         async with httpx.AsyncClient() as client:
@@ -224,6 +235,12 @@ async def fetch_pull_requests(
                 for pr in pull_requests:
                     username = pr["user"]["login"] if pr.get("user") else None
                     author_email = None
+                    
+                    pr_datetime_kst = convert_utc_to_kst(pr["created_at"])
+                    pr_date_kst = pr_datetime_kst.date()
+                    
+                    if pr_date_kst != target_date_kst:
+                        continue
 
                     if username:
                         try:
@@ -234,13 +251,14 @@ async def fetch_pull_requests(
                     mapped_author = git_email.get(author_email, None)
                     if not mapped_author:
                         mapped_author = git_id.get(username, 0)
+                    
 
                     result.append(PullRequestEntry(
                         repo=f"{owner}/{repo}",
                         number=pr["number"],
                         title=pr.get("title"),
                         content=pr.get("body"),
-                        created_at=convert_utc_to_kst(pr["created_at"]),
+                        created_at=pr_datetime_kst,
                         state=pr["state"],
                         author=mapped_author or username
                     ))
@@ -260,11 +278,13 @@ async def fetch_issues(
     repo: str,
     access_token: str,
     git_email: dict[str, int],
-    git_id: dict[str, int]
+    git_id: dict[str, int],
+    date: datetime
 ) -> List[IssueEntry]:
     base_url = f"{BASE_URL}/repos/{owner}/{repo}/issues"
     per_page = 100
     issues = []
+    target_date_kst = date.date()
 
     try:
         async with httpx.AsyncClient() as client:
@@ -289,6 +309,12 @@ async def fetch_issues(
                 for issue in issue_batch:
                     if "pull_request" in issue:
                         continue
+                    
+                    issue_datetime_kst = convert_utc_to_kst(issue["created_at"])
+                    issue_date_kst =issue_datetime_kst.date()
+                    
+                    if issue_date_kst != target_date_kst:
+                        continue
 
                     username = issue["user"]["login"] if issue.get("user") else None
                     author_email = None
@@ -307,7 +333,7 @@ async def fetch_issues(
                         repo=f"{owner}/{repo}",
                         number=issue["number"],
                         title=issue.get("title"),
-                        created_at=convert_utc_to_kst(issue["created_at"]),
+                        created_at=issue_date_kst,
                         state=issue["state"],
                         author=mapped_author or username
                     ))
