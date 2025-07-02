@@ -52,10 +52,10 @@ async def run_batch_with_flush():
     await run_batch()
 
 
-# 매주 월요일 자정에 실행될 작업
+# 금요일 자정에 실행될 작업
 async def run_user_activity_report():
     db = get_db_session()
-    date_str = datetime.now().strftime("%Y-%m-%d")
+    date_str = (datetime.now() - timedelta(days=6)).strftime("%Y-%m-%d")
     try:
         print(f"=== 업무 통계 저장 시작: {date_str} ===")
         save_user_activities_to_rdb(date_str, db)
