@@ -2,13 +2,20 @@ from typing import List
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams
 import requests
+import os
+from dotenv import load_dotenv
 
 from app.common.config import DOCS_COLLECTION_NAME, EMAIL_COLLECTION_NAME, GIT_COLLECTION_NAME, README_COLLECTION_NAME, TEAMS_COLLECTION_NAME
 
+load_dotenv()
+
 def get_qdrant_client() -> QdrantClient:
+  QDRANT_HOST = os.getenv("QDRANT_HOST")
+  QDRANT_PORT = os.getenv("QDRANT_PORT", "6333")
+
   return QdrantClient(
-    host="localhost",
-    port=6333
+    host=QDRANT_HOST,
+    port=QDRANT_PORT
   )
 
 def create_collection(client: QdrantClient, collection_name: str): 
