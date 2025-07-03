@@ -9,7 +9,15 @@ __pycache__/
 # Environment variables
 .env
 .env.*
+env.properties
 *.pem
+
+# k8s related files
+Dockerfile
+Dockerfile.base
+deploy.yaml
+service.yaml
+ingress.yaml
 
 # Virtual environment
 .venv/
