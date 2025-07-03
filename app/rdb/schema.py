@@ -45,11 +45,12 @@ class TeamMember(Base):
     __tablename__ = "team_member"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String)
     role = Column(String)
     team_id = Column(String, ForeignKey("team.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
 
     team = relationship("Team", lazy="select")
+    user = relationship("User", lazy="select")
 
     __table_args__ = (
         CheckConstraint(
