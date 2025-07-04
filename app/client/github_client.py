@@ -8,11 +8,14 @@ import httpx
 import jwt
 import requests
 from sqlalchemy.orm import Session
+from qdrant_client.http import models
 
 from app.client.utils import parse_last_page
 from app.common.utils import convert_utc_to_kst
 from app.schemas.github_activity import CommitEntry, IssueEntry, PullRequestEntry, ReadmeInfo
 from app.rdb.repository import find_all_teams
+from app.vectordb.client import get_qdrant_client
+from app.common.config import README_COLLECTION_NAME
 
 BASE_URL = "https://api.github.com"
 
@@ -361,16 +364,67 @@ async def fetch_readme(owner: str, repo: str, access_token: str) -> Optional[Rea
 
             data = res.json()
             decoded = b64decode(data["content"]).decode("utf-8")
-            return ReadmeInfo(
-                repo_name=f"{owner}/{repo}",
-                content=decoded,
-                html_url=data["html_url"],
-                download_url=data.get("download_url")
-            )
+            repo_name = f"{owner}/{repo}"
+            readme_hash = data.get("sha", "")
+        
+            if await get_sha_from_vector_db(repo_name) == readme_hash:
+                print(f"{repo_name}의 README 변경사항 없음. 저장 생략.")
+                return None
+            else: 
+                print(f"{repo_name}의 README 변경사항 있음. 저장 진행.")
+                return ReadmeInfo(
+                    repo_name=repo_name,
+                    content=decoded,
+                    html_url=data["html_url"],
+                    download_url=data.get("download_url"),
+                    readme_hash=readme_hash
+                )
+
 
     except httpx.HTTPStatusError as e:
         print(f"HTTP error occurred while fetching README: {e.response.status_code} - {e.response.text}")
         return None
     except Exception as e:
         print(f"Unexpected error occurred while fetching README: {e}")
+        return None
+    
+
+async def get_sha_from_vector_db(repo_name: str) -> Optional[str]:
+    """
+    벡터 DB에서 주어진 repo_name에 해당하는 README의 SHA를 조회합니다.
+    """
+
+    try:
+        client = get_qdrant_client()
+
+        if not client.collection_exists(README_COLLECTION_NAME):
+            return None
+
+        # Qdrant scroll 메서드 올바른 사용법
+        result = client.scroll(
+            collection_name=README_COLLECTION_NAME,
+            limit=1,
+            scroll_filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="repo_name",
+                        match=models.MatchValue(value=repo_name)
+                    )
+                ]
+            ),
+            with_payload=True  # 페이로드 포함
+        )
+
+        # 결과에서 SHA 추출
+        points, _ = result
+        if points:
+            point = points[0]
+            sha = point.payload.get('readme_hash')
+            print(f"벡터DB에서 조회한 {repo_name} SHA: {sha[:8] if sha else 'None'}...")
+            return sha
+        else:
+            print(f"벡터DB에서 {repo_name}을 찾을 수 없습니다.")
+            return None
+    except Exception as e:
+        print(f"Error fetching SHA from vector DB for {repo_name}: {e}")
         return None

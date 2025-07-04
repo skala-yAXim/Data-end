@@ -58,6 +58,7 @@ class GitReadMeMetadata(BaseMetadata):
   repo_name: str
   html_url: str
   download_url: str
+  readme_hash: str
   
 M = TypeVar("M", bound=BaseMetadata)
 

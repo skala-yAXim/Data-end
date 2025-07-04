@@ -31,9 +31,14 @@ async def save_all_data_for_repo(owner: str, repo: str, access_token: str, git_e
     
     readme = await fetch_readme(owner, repo, access_token)
     
-    readme_record = extract_record_from_readme(readme)
+    if readme:
+        readme_record = extract_record_from_readme(readme)
+    else: 
+        readme_record = None
+
     if readme_record:
         upload_data_to_db(collection_name=README_COLLECTION_NAME, records=[readme_record])
+        print(f"README 업로드 완료: {readme_record.metadata.repo_name}")
     else:
         print("README 데이터 없음. 업로드 생략.")
     

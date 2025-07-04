@@ -56,6 +56,7 @@ def extract_record_from_readme(
         metadata=GitReadMeMetadata(
             repo_name=readme.repo_name,
             html_url=readme.html_url,
-            download_url=readme.download_url
+            download_url=readme.download_url,
+            readme_hash=readme.readme_hash or ""
         )
     )

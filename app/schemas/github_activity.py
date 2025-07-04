@@ -31,6 +31,7 @@ class ReadmeInfo(BaseModel):
     content: str
     html_url: str
     download_url: Optional[str]
+    readme_hash: str
 
 class GitActivity(BaseModel):
     repo: str
