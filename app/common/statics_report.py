@@ -31,7 +31,7 @@ def save_user_activities_to_rdb(target_date: str, db: Session):
                 teams_post=teams.get("post"),
                 teams_reply=teams.get("reply"),
                 email_send=email.get("sender"),
-                email_receive=email.get("receiver"),
+                email_receive=email.get("receivers"),
                 docs_docx=docs.get("docx"),
                 docs_xlsx=docs.get("xlsx"),
                 docs_pptx=docs.get("pptx"),
