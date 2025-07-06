@@ -273,10 +273,8 @@ def fetch_drive_files(
             if last_modified.date() != target_date:
                 continue
             
-            mime_type = item["file"].get("mimeType")
-            ext = mimetypes.guess_extension(mime_type)
-            if ext:
-                file_type = ext.lstrip(".")
+            if '.' in filename:
+                file_type = filename.split('.')[-1].lower()
             else:
                 file_type = "unknown"
         else:
