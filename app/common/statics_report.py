@@ -115,7 +115,7 @@ def teams_report(client: QdrantClient, user: User, start_str: str, end_str: str)
 
 
 def email_report(client: QdrantClient, user: User, start_str: str, end_str: str) -> dict:
-    metadata_combinations = ["sender", "receiver"]
+    metadata_combinations = ["sender", "receivers"]
 
     result = {}
 
