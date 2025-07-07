@@ -77,7 +77,7 @@ async def run_user_activity_report():
 
 async def run_all_jobs_for_friday():
     await run_batch()
-    # await run_user_activity_report()
+    await run_user_activity_report()
     await create_weekly_report()
     await create_team_weekly_report()
     print(f"=== 금요일 배치 작업 완료: {datetime.now()} ===\n")
